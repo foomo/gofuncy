@@ -34,7 +34,7 @@ func TestGo_WithContext(t *testing.T) {
 		assert.Equal(t, "value", ctx.Value("key"))
 		return nil
 	}
-	errChan := gofuncy.Go(operation, gofuncy.WithContext(context.WithValue(context.Background(), "key", "value")))
+	errChan := gofuncy.Go(operation, gofuncy.WithContext(context.WithValue(context.Background(), "key", "value"))) //nolint
 	assert.NoError(t, <-errChan)
 }
 

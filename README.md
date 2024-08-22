@@ -60,6 +60,101 @@ func main() {
 }
 ```
 
+## Concept
+
+### Routines
+
+#### Error
+
+Each routine can return an error that is being returned through an error channel:
+
+```go
+errChan := gofuncy.Go(func (ctx context.Context) error {
+return nil
+})
+
+if err := <- errChan; err != nil {
+panic(err)
+}
+```
+
+#### Context
+
+Each routine will receive its own base context, which can be set:
+
+```go
+errChan := gofuncy.Go(send(msg), gofuncy.WithContext(context.Background()))
+```
+
+```mermaid
+flowchart TB
+  subgraph root
+    channel[Channel]
+    subgraph "Routine A"
+      ctxA[ctx] --> senderA
+      senderA[Sender]
+    end
+    subgraph "Routine B"
+      ctxB[ctx] --> senderB
+      senderB[Sender]
+    end
+    senderA --> channel
+    senderB --> channel
+    channel --> receiverC
+    subgraph "Routine C"
+      ctxC[ctx] --> receiverC
+      receiverC[Receiver]
+    end
+  end
+```
+
+#### Names
+
+Using the context we will inject a name for the process so that it can always be identified:
+
+```mermaid
+flowchart TB
+  subgraph root
+    channel[Channel]
+    subgraph "Routine A"
+      ctxA[ctx] -- ctx: sender - a --> senderA
+      senderA[Sender]
+    end
+    subgraph "Routine B"
+      ctxB[ctx] -- ctx: sender - b --> senderB
+      senderB[Sender]
+    end
+    senderA --> channel
+    senderB --> channel
+    channel --> receiverC
+    subgraph "Routine C"
+      ctxC[ctx] -- ctx: receiver - b --> receiverC
+      receiverC[Receiver]
+    end
+  end
+```
+
+#### Telemetry
+
+Metrics:
+
+| Name                       | Type          |
+|----------------------------|---------------|
+| `gofuncy.routine.count`    | UpDownCounter |
+| `gofuncy.routine.duration` | Histogram     |
+
+```mermaid
+flowchart TB
+  subgraph root
+    subgraph rA ["Routine A"]
+      handler[Handler]
+    end
+    rA -- gofuncy . routine . count --> Metrics
+    rA -- gofuncy . routine . duration --> Metrics
+    rA -- span: routine - a --> Trace
+  end
+```
+
 ## How to Contribute
 
 Make a pull request...

@@ -12,6 +12,10 @@ const (
 	contextKeySender        contextKey = "sender"
 )
 
+func RootContext(ctx context.Context) context.Context {
+	return injectRoutineIntoContext(ctx, "root")
+}
+
 func injectRoutineIntoContext(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, contextKeyRoutine, name)
 }

@@ -5,7 +5,7 @@ import (
 )
 
 type Value[T any] struct {
-	ctx  context.Context
+	ctx  context.Context //nolint:containedctx // required
 	Data T
 }
 

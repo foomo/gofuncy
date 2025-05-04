@@ -7,11 +7,16 @@ import (
 	"time"
 
 	"github.com/foomo/gofuncy"
+	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
+	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/trace"
+	"go.uber.org/zap"
 )
 
 var meter *metric.MeterProvider
@@ -31,6 +36,7 @@ func init() {
 	{
 		exp, _ := stdouttrace.New(stdouttrace.WithPrettyPrint())
 		tracer = trace.NewTracerProvider(
+			trace.WithSampler(trace.AlwaysSample()),
 			trace.WithBatcher(exp),
 		)
 		otel.SetTracerProvider(tracer)
@@ -54,10 +60,15 @@ func init() {
 }
 
 func main() {
+	l := otelzap.New(zap.NewExample())
+
+	ctx := gofuncy.RootContext(context.Background())
+
 	go func() {
 		time.Sleep(10 * time.Second)
 		// _ = meter.ForceFlush(context.Background())
-		_ = tracer.ForceFlush(context.Background())
+		_ = tracer.ForceFlush(ctx)
+		l.Info("exiting")
 		os.Exit(0)
 	}()
 
@@ -68,15 +79,16 @@ func main() {
 		gofuncy.ChannelWithValueAttributeEnabled[string](true),
 	)
 
-	fmt.Println("start")
+	l.Info("start")
 
 	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTelemetryEnabled(true))
 	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTelemetryEnabled(true))
 	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTelemetryEnabled(true))
 
-	_ = gofuncy.Go(receive(msg), gofuncy.WithName("receiver-a"))
-	_ = receive(msg)(context.Background())
+	_ = gofuncy.Go(receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTelemetryEnabled(true))
+	// _ = receive(l, msg)(ctx)
 
+	time.Sleep(time.Minute)
 }
 
 func send(msg *gofuncy.Channel[string]) gofuncy.Func {
@@ -90,10 +102,14 @@ func send(msg *gofuncy.Channel[string]) gofuncy.Func {
 	}
 }
 
-func receive(msg *gofuncy.Channel[string]) gofuncy.Func {
+func receive(l *otelzap.Logger, msg *gofuncy.Channel[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
 		for m := range msg.Receive() {
-			fmt.Println("Message:", m.Data, "Handler:", gofuncy.RoutineFromContext(ctx), "Sender:", gofuncy.SenderFromContext(m.Context()))
+			l.Ctx(ctx).Error("received message",
+				zap.String("data", m.Data),
+				zap.String("handler", gofuncy.RoutineFromContext(ctx)),
+				zap.String("sender", gofuncy.SenderFromContext(m.Context())),
+			)
 			// fmt.Println(m, len(msg))
 			time.Sleep(time.Second)
 		}

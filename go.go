@@ -162,7 +162,9 @@ func Go(fn Func, opts ...Option) <-chan error {
 		var span trace.Span
 		if o.tracer != nil {
 			ctx, span = o.tracer.Start(o.ctx, o.name)
-			l = l.With("trace_id", span.SpanContext().TraceID().String())
+			if span.IsRecording() {
+				l = l.With("trace_id", span.SpanContext().TraceID().String())
+			}
 			defer span.End()
 		}
 		l.Log(ctx, o.level, "starting gofuncy routine")
@@ -187,12 +189,8 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 		ctx = injectParentRoutineIntoContext(ctx, RoutineFromContext(ctx))
 		ctx = injectRoutineIntoContext(ctx, o.name)
-		l.Info("gofuncy --> calling")
 		err = fn(ctx)
-		l.Info("gofuncy --> done")
-		defer l.Info("gofuncy --> out")
 		errChan <- err
-		l.Info("gofuncy <-- done")
 	}(o, errChan)
 
 	o.l.Info("gofuncy --> returning")

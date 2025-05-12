@@ -11,8 +11,9 @@ import (
 
 	"github.com/Ju0x/humanhash"
 	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
+	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 )
 
@@ -28,6 +29,7 @@ type (
 		counterName      string
 		histogram        metric.Int64Histogram
 		histogramName    string
+		histogramEnabled bool
 		telemetryEnabled bool
 	}
 	Option func(*Options)
@@ -45,21 +47,27 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
-func WithTelemetryEnabled(enabled bool) Option {
+func WithMeter(v metric.Meter) Option {
 	return func(o *Options) {
-		o.telemetryEnabled = enabled
+		o.meter = v
 	}
 }
 
-func WithMeter(meter metric.Meter) Option {
+func WithTracer(v trace.Tracer) Option {
 	return func(o *Options) {
-		o.meter = meter
+		o.tracer = v
 	}
 }
 
 func WithCounterName(name string) Option {
 	return func(o *Options) {
 		o.counterName = name
+	}
+}
+
+func WithHistogramEnabled(v bool) Option {
+	return func(o *Options) {
+		o.histogramEnabled = v
 	}
 }
 
@@ -101,12 +109,22 @@ func Go(fn Func, opts ...Option) <-chan error {
 		if o.tracer == nil {
 			o.tracer = otel.Tracer("gofuncy")
 		}
-		if value, err := o.meter.Int64UpDownCounter(o.counterName); err != nil {
-			o.l.Error("failed to initialize gauge", "error", err)
+	}
+	if o.meter != nil {
+		if value, err := o.meter.Int64UpDownCounter(
+			o.counterName,
+			metric.WithDescription("Gofuncy routine counter"),
+		); err != nil {
+			o.l.Error("failed to initialize counter", "error", err)
 		} else {
 			o.counter = value
 		}
-		if value, err := o.meter.Int64Histogram(o.histogramName); err != nil {
+	}
+	if o.meter != nil && o.histogramEnabled {
+		if value, err := o.meter.Int64Histogram(
+			o.histogramName,
+			metric.WithDescription("Gofuncy routine duration histogram"),
+		); err != nil {
 			o.l.Error("failed to initialize histogram", "error", err)
 		} else {
 			o.histogram = value
@@ -114,9 +132,10 @@ func Go(fn Func, opts ...Option) <-chan error {
 	}
 
 	err := make(chan error)
-	go func(o *Options, err chan<- error) {
-		defer close(err)
+	go func(o *Options, errChan chan<- error) {
+		defer close(errChan)
 		ctx := o.ctx
+		var err error
 		var span trace.Span
 		if o.tracer != nil {
 			ctx, span = o.tracer.Start(o.ctx, o.name)
@@ -124,18 +143,23 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 		// create telemetry if enabled
 		if o.counter != nil {
-			o.counter.Add(ctx, 1, metric.WithAttributes(semconv.ProcessRuntimeName(o.name)))
-			defer o.counter.Add(ctx, -1, metric.WithAttributes(semconv.ProcessRuntimeName(o.name)))
+			attrs := metric.WithAttributes(semconv.ProcessRuntimeName(o.name))
+			o.counter.Add(ctx, 1, attrs)
+			defer o.counter.Add(ctx, -1, attrs)
 		}
 		if o.histogram != nil {
 			start := time.Now()
 			defer func() {
-				o.histogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(semconv.ProcessRuntimeName(o.name)))
+				o.histogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
+					semconv.ProcessRuntimeName(o.name),
+					attribute.Bool("error", err != nil),
+				))
 			}()
 		}
 		ctx = injectParentRoutineIntoContext(ctx, RoutineFromContext(ctx))
 		ctx = injectRoutineIntoContext(ctx, o.name)
-		err <- fn(ctx)
+		err = fn(ctx)
+		errChan <- err
 	}(o, err)
 	return err
 }

@@ -145,13 +145,13 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 	}
 
-	errChan := make(chan error)
+	errChan := make(chan error, 1)
 	go func(o *Options, errChan chan<- error) {
 		var err error
 		defer func() {
 			o.l.Info("gofuncy --> closing chan")
 			close(errChan)
-			o.l.Info("gofuncy --> closing chan done")
+			o.l.Info("gofuncy --> closing chan")
 		}()
 		ctx := o.ctx
 		start := time.Now()
@@ -187,11 +187,12 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 		ctx = injectParentRoutineIntoContext(ctx, RoutineFromContext(ctx))
 		ctx = injectRoutineIntoContext(ctx, o.name)
-		o.l.Info("gofuncy --> calling")
+		l.Info("gofuncy --> calling")
 		err = fn(ctx)
-		o.l.Info("gofuncy --> done")
-		defer o.l.Info("gofuncy --> out")
+		l.Info("gofuncy --> done")
+		defer l.Info("gofuncy --> out")
 		errChan <- err
+		l.Info("gofuncy <-- done")
 	}(o, errChan)
 
 	o.l.Info("gofuncy --> returning")

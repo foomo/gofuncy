@@ -48,6 +48,12 @@ func WithContext(ctx context.Context) Option {
 	}
 }
 
+func WithLogger(l *slog.Logger) Option {
+	return func(o *Options) {
+		o.l = l
+	}
+}
+
 func WithLogLevel(level slog.Level) Option {
 	return func(o *Options) {
 		o.level = level

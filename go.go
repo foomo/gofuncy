@@ -145,10 +145,14 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 	}
 
-	err := make(chan error)
+	errChan := make(chan error)
 	go func(o *Options, errChan chan<- error) {
 		var err error
-		defer close(errChan)
+		defer func() {
+			o.l.Info("gofuncy --> closing chan")
+			close(errChan)
+			o.l.Info("gofuncy --> closing chan done")
+		}()
 		ctx := o.ctx
 		start := time.Now()
 		l := o.l.With("name", o.name)
@@ -176,17 +180,20 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 		if o.histogram != nil {
 			start := time.Now()
-			defer func() {
-				o.histogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
-					semconv.ProcessRuntimeName(o.name),
-					attribute.Bool("error", err != nil),
-				))
-			}()
+			defer o.histogram.Record(ctx, time.Since(start).Milliseconds(), metric.WithAttributes(
+				semconv.ProcessRuntimeName(o.name),
+				attribute.Bool("error", err != nil),
+			))
 		}
 		ctx = injectParentRoutineIntoContext(ctx, RoutineFromContext(ctx))
 		ctx = injectRoutineIntoContext(ctx, o.name)
+		o.l.Info("gofuncy --> calling")
 		err = fn(ctx)
+		o.l.Info("gofuncy --> done")
+		defer o.l.Info("gofuncy --> out")
 		errChan <- err
-	}(o, err)
-	return err
+	}(o, errChan)
+
+	o.l.Info("gofuncy --> returning")
+	return errChan
 }

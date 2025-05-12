@@ -19,9 +19,10 @@ import (
 
 type (
 	Options struct {
-		l    *slog.Logger
-		ctx  context.Context //nolint:containedctx // required
-		name string
+		l     *slog.Logger
+		ctx   context.Context //nolint:containedctx // required
+		level slog.Level
+		name  string
 		// telemetry
 		meter            metric.Meter
 		tracer           trace.Tracer
@@ -44,6 +45,12 @@ func WithName(name string) Option {
 func WithContext(ctx context.Context) Option {
 	return func(o *Options) {
 		o.ctx = ctx
+	}
+}
+
+func WithLogLevel(level slog.Level) Option {
+	return func(o *Options) {
+		o.level = level
 	}
 }
 
@@ -80,6 +87,7 @@ func WithHistogramName(name string) Option {
 func Go(fn Func, opts ...Option) <-chan error {
 	o := &Options{
 		l:                slog.Default(),
+		level:            slog.LevelDebug,
 		counterName:      "gofuncy.routine.count",
 		histogramName:    "gofuncy.routine.duration",
 		telemetryEnabled: os.Getenv("OTEL_ENABLED") == "true",
@@ -133,14 +141,27 @@ func Go(fn Func, opts ...Option) <-chan error {
 
 	err := make(chan error)
 	go func(o *Options, errChan chan<- error) {
+		var err error
 		defer close(errChan)
 		ctx := o.ctx
-		var err error
+		start := time.Now()
+		l := o.l.With("name", o.name)
+		if value := RoutineFromContext(ctx); value != "" {
+			l = l.With("parent", value)
+		}
 		var span trace.Span
 		if o.tracer != nil {
 			ctx, span = o.tracer.Start(o.ctx, o.name)
+			l = l.With("trace_id", span.SpanContext().TraceID().String())
 			defer span.End()
 		}
+		l.Log(ctx, o.level, "starting gofuncy routine")
+		defer func() {
+			if err != nil {
+				l = l.With("error", err.Error())
+			}
+			l.Log(ctx, o.level, "exiting gofuncy routine", "duration", time.Since(start).Round(time.Millisecond).String())
+		}()
 		// create telemetry if enabled
 		if o.counter != nil {
 			attrs := metric.WithAttributes(semconv.ProcessRuntimeName(o.name))

@@ -74,7 +74,7 @@ func ChannelWithCounterName[T any](name string) ChannelOption[T] {
 
 func ChannelWithHistogramName(name string) Option {
 	return func(o *Options) {
-		o.histogramName = name
+		o.durationHistogramName = name
 	}
 }
 

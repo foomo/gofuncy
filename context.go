@@ -7,6 +7,7 @@ import (
 type contextKey string
 
 const (
+	NoNameRoutine           string     = "noname"
 	contextKeyRoutine       contextKey = "routine"
 	contextKeyParentRoutine contextKey = "parentRoutine"
 	contextKeySender        contextKey = "sender"
@@ -24,7 +25,7 @@ func RoutineFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(contextKeyRoutine).(string); ok {
 		return value
 	}
-	return "noname"
+	return NoNameRoutine
 }
 
 func injectSenderIntoContext(ctx context.Context, name string) context.Context {

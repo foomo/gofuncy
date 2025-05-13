@@ -11,6 +11,7 @@ import (
 	"github.com/Ju0x/humanhash"
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
 	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
@@ -180,7 +181,13 @@ func Go(fn Func, opts ...Option) <-chan error {
 			if span.IsRecording() {
 				l = l.With(zap.String("trace_id", span.SpanContext().TraceID().String()))
 			}
-			defer span.End()
+			defer func() {
+				if err != nil {
+					span.RecordError(err)
+					span.SetStatus(codes.Error, err.Error())
+				}
+				span.End()
+			}()
 		}
 		l.Log(o.level, "starting gofuncy routine",
 			zap.Duration("delay", time.Since(delay).Round(time.Millisecond)),
@@ -198,8 +205,7 @@ func Go(fn Func, opts ...Option) <-chan error {
 			defer o.runningCounter.Add(ctx, -1, attrs)
 		}
 		if o.completedCounter != nil {
-			o.completedCounter.Add(ctx, 1, attrs)
-			defer o.runningCounter.Add(ctx, -1, attrs, metric.WithAttributes(
+			defer o.runningCounter.Add(ctx, 1, attrs, metric.WithAttributes(
 				attribute.Bool("error", err != nil),
 			))
 		}

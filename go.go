@@ -27,10 +27,10 @@ type (
 		// telemetry
 		meter                    metric.Meter
 		tracer                   trace.Tracer
-		totalCounter             metric.Int64Counter
-		totalCounterName         string
 		runningCounter           metric.Int64UpDownCounter
 		runningCounterName       string
+		completedCounter         metric.Int64Counter
+		completedCounterName     string
 		durationHistogram        metric.Int64Histogram
 		durationHistogramName    string
 		durationHistogramEnabled bool
@@ -75,9 +75,9 @@ func WithTracer(v trace.Tracer) Option {
 	}
 }
 
-func WithTotalCounterName(name string) Option {
+func WithCompletedCounterName(name string) Option {
 	return func(o *Options) {
-		o.totalCounterName = name
+		o.completedCounterName = name
 	}
 }
 
@@ -103,8 +103,8 @@ func Go(fn Func, opts ...Option) <-chan error {
 	o := &Options{
 		l:                     zap.NewNop(),
 		level:                 zapcore.DebugLevel,
-		totalCounterName:      "gofuncy.routine.total.count",
 		runningCounterName:    "gofuncy.routine.running.count",
+		completedCounterName:  "gofuncy.routine.completed.count",
 		durationHistogramName: "gofuncy.routine.duration",
 		telemetryEnabled:      os.Getenv("OTEL_ENABLED") == "true",
 	}
@@ -135,14 +135,6 @@ func Go(fn Func, opts ...Option) <-chan error {
 		}
 	}
 	if o.meter != nil {
-		if value, err := o.meter.Int64Counter(
-			o.totalCounterName,
-			metric.WithDescription("Gofuncy total go routine count"),
-		); err != nil {
-			o.l.Error("failed to initialize counter", zap.Error(err))
-		} else {
-			o.totalCounter = value
-		}
 		if value, err := o.meter.Int64UpDownCounter(
 			o.runningCounterName,
 			metric.WithDescription("Gofuncy running go routine count"),
@@ -150,6 +142,14 @@ func Go(fn Func, opts ...Option) <-chan error {
 			o.l.Error("failed to initialize counter", zap.Error(err))
 		} else {
 			o.runningCounter = value
+		}
+		if value, err := o.meter.Int64Counter(
+			o.completedCounterName,
+			metric.WithDescription("Gofuncy completed go routine count"),
+		); err != nil {
+			o.l.Error("failed to initialize counter", zap.Error(err))
+		} else {
+			o.completedCounter = value
 		}
 	}
 	if o.meter != nil && o.durationHistogramEnabled {
@@ -197,8 +197,8 @@ func Go(fn Func, opts ...Option) <-chan error {
 			o.runningCounter.Add(ctx, 1, attrs)
 			defer o.runningCounter.Add(ctx, -1, attrs)
 		}
-		if o.totalCounter != nil {
-			o.totalCounter.Add(ctx, 1, attrs)
+		if o.completedCounter != nil {
+			o.completedCounter.Add(ctx, 1, attrs)
 			defer o.runningCounter.Add(ctx, -1, attrs, metric.WithAttributes(
 				attribute.Bool("error", err != nil),
 			))

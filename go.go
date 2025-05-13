@@ -205,7 +205,7 @@ func Go(fn Func, opts ...Option) <-chan error {
 			defer o.runningCounter.Add(ctx, -1, attrs)
 		}
 		if o.completedCounter != nil {
-			defer o.runningCounter.Add(ctx, 1, attrs, metric.WithAttributes(
+			defer o.completedCounter.Add(ctx, 1, attrs, metric.WithAttributes(
 				attribute.Bool("error", err != nil),
 			))
 		}

@@ -6,43 +6,61 @@ import (
 	"time"
 
 	"github.com/foomo/gofuncy"
+	"go.uber.org/zap"
 )
 
 func main() {
+	l, _ := zap.NewDevelopment()
+	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	ctx = gofuncy.Ctx(ctx).Root()
+	defer cancel()
 
-	msg := gofuncy.NewChannel[string](
-		gofuncy.ChannelWithBufferSize[string](10),
+	ch := gofuncy.NewChan[string](
+		gofuncy.ChanWithLogger[string](l),
+		gofuncy.ChanWithBuffer[string](3),
 	)
+	defer ch.Close()
 
 	fmt.Println("start")
 
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-a"))
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-b"))
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-c"))
+	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-a"))
+	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-b"))
+	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-c"))
 
-	_ = gofuncy.Go(receive(msg), gofuncy.WithName("receiver-a"))
-	_ = receive(msg)(context.Background())
+	_ = gofuncy.Go(ctx, receive(ch), gofuncy.WithName("receiver-a"))
+	_ = receive(ch)(ctx)
+
 	fmt.Println("done")
 }
 
-func send(msg *gofuncy.Channel[string]) gofuncy.Func {
+func send(ch *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
-		for {
-			if err := msg.Send(ctx, fmt.Sprintf("Hello World")); err != nil {
+		name := gofuncy.Ctx(ctx).Name()
+		for i := range 3 {
+			if err := ch.Send(ctx, fmt.Sprintf("#%d from %s", i, name)); err != nil {
 				return err
 			}
-			time.Sleep(300 * time.Millisecond)
 		}
+		fmt.Println("sent all messages from " + name)
+		return nil
 	}
 }
 
-func receive(msg *gofuncy.Channel[string]) gofuncy.Func {
+func receive(ch *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
-		for m := range msg.Receive() {
-			fmt.Println("Message:", m.Data, "Handler:", gofuncy.RoutineFromContext(ctx), "Sender:", gofuncy.SenderFromContext(m.Context()))
-			// fmt.Println(m, len(msg))
-			time.Sleep(time.Second)
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("context done")
+				return ctx.Err()
+			case m, ok := <-ch.Receive(ctx):
+				if ok {
+					fmt.Println("Handler:", gofuncy.NameFromContext(ctx), "Message:", m)
+				} else {
+					fmt.Println("channel closed")
+					return nil
+				}
+			}
 		}
-		return nil
 	}
 }

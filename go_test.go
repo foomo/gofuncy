@@ -3,47 +3,49 @@ package gofuncy_test
 import (
 	"context"
 	"errors"
+	"sync/atomic"
 	"testing"
 
 	"github.com/foomo/gofuncy"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"go.uber.org/zap/zaptest"
 )
 
 func TestGo(t *testing.T) {
 	t.Parallel()
-	operation := func(ctx context.Context) error {
-		return nil
-	}
-	errChan := gofuncy.Go(operation)
-	assert.NoError(t, <-errChan)
+	var called atomic.Bool
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			called.Store(true)
+			return nil
+		},
+		gofuncy.WithLogger(zaptest.NewLogger(t)),
+	)
+	require.NoError(t, <-errChan)
+	assert.True(t, called.Load())
 }
 
-func TestGoError(t *testing.T) {
+func TestGo_Error(t *testing.T) {
 	t.Parallel()
-	err := errors.New("error")
-	operation := func(ctx context.Context) error {
-		return err
-	}
-	errChan := gofuncy.Go(operation)
-	assert.ErrorIs(t, err, <-errChan)
-}
-
-func TestGo_WithContext(t *testing.T) {
-	t.Parallel()
-	operation := func(ctx context.Context) error {
-		assert.Equal(t, "value", ctx.Value("key"))
-		return nil
-	}
-	errChan := gofuncy.Go(operation, gofuncy.WithContext(context.WithValue(context.Background(), "key", "value"))) //nolint
-	assert.NoError(t, <-errChan)
+	expected := errors.New("error")
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			return expected
+		},
+	)
+	assert.ErrorIs(t, expected, <-errChan)
 }
 
 func TestGo_WithName(t *testing.T) {
 	t.Parallel()
-	operation := func(ctx context.Context) error {
-		assert.Equal(t, "gofuncy", gofuncy.RoutineFromContext(ctx))
-		return nil
-	}
-	errChan := gofuncy.Go(operation, gofuncy.WithName("gofuncy"))
+	expected := "gofuncy_test"
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
+			return nil
+		},
+		gofuncy.WithName(expected),
+	)
 	assert.NoError(t, <-errChan)
 }

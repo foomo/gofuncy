@@ -62,7 +62,7 @@ func init() {
 func main() {
 	l := otelzap.New(zap.NewExample())
 
-	ctx := gofuncy.RootContext(context.Background())
+	ctx := gofuncy.Ctx(context.Background()).Root()
 
 	go func() {
 		time.Sleep(10 * time.Second)
@@ -72,26 +72,26 @@ func main() {
 		os.Exit(0)
 	}()
 
-	msg := gofuncy.NewChannel[string](
+	msg := gofuncy.NewChan[string](
 		// gofuncy.ChannelWithBufferSize[string](5),
-		gofuncy.ChannelWithTelemetryEnabled[string](true),
-		gofuncy.ChannelWithValueEventsEnabled[string](true),
-		gofuncy.ChannelWithValueAttributeEnabled[string](true),
+		gofuncy.ChanWithTelemetryEnabled[string](true),
+		gofuncy.ChanWithValueEventsEnabled[string](true),
+		gofuncy.ChanWithValueAttributeEnabled[string](true),
 	)
 
 	l.Info("start")
 
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTelemetryEnabled(true))
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTelemetryEnabled(true))
-	_ = gofuncy.Go(send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTelemetryEnabled(true))
 
-	_ = gofuncy.Go(receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTelemetryEnabled(true))
 	// _ = receive(l, msg)(ctx)
 
 	time.Sleep(time.Minute)
 }
 
-func send(msg *gofuncy.Channel[string]) gofuncy.Func {
+func send(msg *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
 		for {
 			if err := msg.Send(ctx, fmt.Sprintf("Hello World")); err != nil {
@@ -102,12 +102,12 @@ func send(msg *gofuncy.Channel[string]) gofuncy.Func {
 	}
 }
 
-func receive(l *otelzap.Logger, msg *gofuncy.Channel[string]) gofuncy.Func {
+func receive(l *otelzap.Logger, msg *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
 		for m := range msg.Receive() {
 			l.Ctx(ctx).Error("received message",
 				zap.String("data", m.Data),
-				zap.String("handler", gofuncy.RoutineFromContext(ctx)),
+				zap.String("handler", gofuncy.NameFromContext(ctx)),
 				zap.String("sender", gofuncy.SenderFromContext(m.Context())),
 			)
 			// fmt.Println(m, len(msg))

@@ -6,26 +6,61 @@ import (
 
 type contextKey string
 
+type Context struct {
+	context.Context
+}
+
 const (
-	NoNameRoutine           string     = "noname"
-	contextKeyRoutine       contextKey = "routine"
-	contextKeyParentRoutine contextKey = "parentRoutine"
-	contextKeySender        contextKey = "sender"
+	NameRoot   string = "root"
+	NameNoName string = "noname"
 )
 
-func RootContext(ctx context.Context) context.Context {
-	return injectRoutineIntoContext(ctx, "root")
+const (
+	contextKeyName   contextKey = "name"
+	contextKeyParent contextKey = "parentRoutine"
+	contextKeySender contextKey = "sender"
+)
+
+// Ctx helper
+func Ctx(ctx context.Context) Context {
+	return Context{Context: ctx}
 }
 
-func injectRoutineIntoContext(ctx context.Context, name string) context.Context {
-	return context.WithValue(ctx, contextKeyRoutine, name)
+// Name returns the routine name from the given context
+func (c Context) Name() string {
+	return NameFromContext(c)
 }
 
-func RoutineFromContext(ctx context.Context) string {
-	if value, ok := ctx.Value(contextKeyRoutine).(string); ok {
+// Parent returns the parent routine name from the given context
+func (c Context) Parent() string {
+	return ParentFromContext(c)
+}
+
+// Root returns the context with the `root` name set
+func (c Context) Root() context.Context {
+	return injectNameIntoContext(c.Context, NameRoot)
+}
+
+func injectNameIntoContext(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, contextKeyName, name)
+}
+
+func NameFromContext(ctx context.Context) string {
+	if value, ok := ctx.Value(contextKeyName).(string); ok {
 		return value
 	}
-	return NoNameRoutine
+	return NameNoName
+}
+
+func injectParentIntoContext(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, contextKeyParent, name)
+}
+
+func ParentFromContext(ctx context.Context) string {
+	if value, ok := ctx.Value(contextKeyParent).(string); ok {
+		return value
+	}
+	return ""
 }
 
 func injectSenderIntoContext(ctx context.Context, name string) context.Context {
@@ -34,17 +69,6 @@ func injectSenderIntoContext(ctx context.Context, name string) context.Context {
 
 func SenderFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(contextKeySender).(string); ok {
-		return value
-	}
-	return ""
-}
-
-func injectParentRoutineIntoContext(ctx context.Context, name string) context.Context {
-	return context.WithValue(ctx, contextKeyParentRoutine, name)
-}
-
-func ParentRoutineFromContext(ctx context.Context) string {
-	if value, ok := ctx.Value(contextKeyParentRoutine).(string); ok {
 		return value
 	}
 	return ""

@@ -4,4 +4,4 @@ import (
 	"errors"
 )
 
-var ErrChannelClosed = errors.New("channel is closed")
+var ErrChanClosed = errors.New("channel is closed")

@@ -130,7 +130,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		level:                      zapcore.DebugLevel,
 		name:                       NameNoName,
 		buffer:                     0,
-		closing:                    make(chan struct{}, 1),
+		closing:                    make(chan struct{}),
 		countMetricName:            "gofuncy.chans",
 		messagesCountMetricName:    "gofuncy.messages",
 		messagesDurationMetricName: "gofuncy.messages.duration",
@@ -149,11 +149,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 	)
 
 	// create channel
-	if inst.buffer == 0 {
-		inst.channel = make(chan Message[T])
-	} else {
-		inst.channel = make(chan Message[T], inst.buffer)
-	}
+	inst.channel = make(chan Message[T], inst.buffer)
 
 	// create telemetry if enabled
 	if inst.telemetryEnabled {
@@ -237,32 +233,30 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 
 	out := make(chan T, 1)
 
-	for {
-		select {
-		case <-ctx.Done():
+	select {
+	case <-ctx.Done():
+		close(out)
+		return out
+	case msg, ok := <-g.channel:
+		if !ok {
 			close(out)
 			return out
-		case msg, ok := <-g.channel:
-			if !ok {
-				close(out)
-				return out
-			}
-
-			if g.messagesCountMetric != nil {
-				g.messagesCountMetric.Add(ctx, -1, metric.WithAttributes(
-					attribute.String("chan_name", g.name)),
-				)
-			}
-
-			l.Debug("received messages",
-				zap.String("gofuncy_sender", msg.Sender()),
-				zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
-			)
-
-			out <- msg.value
-
-			return out
 		}
+
+		if g.messagesCountMetric != nil {
+			g.messagesCountMetric.Add(ctx, -1, metric.WithAttributes(
+				attribute.String("chan_name", g.name)),
+			)
+		}
+
+		l.Debug("received messages",
+			zap.String("gofuncy_sender", msg.Sender()),
+			zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
+		)
+
+		out <- msg.value
+
+		return out
 	}
 }
 
@@ -354,14 +348,11 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 
 // Close closes the GoChannel Pub/Sub.
 func (g *Chan[T]) Close() {
-	if g.isClosed.Load() {
+	if !g.isClosed.CompareAndSwap(false, true) {
 		return
 	}
 
-	g.isClosed.Store(true)
-
-	g.closing <- struct{}{}
-
+	close(g.closing)
 	close(g.channel)
 	g.l.Debug("closed")
 }

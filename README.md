@@ -1,9 +1,12 @@
-# gofuncy
-
 [![Build Status](https://github.com/foomo/gofuncy/actions/workflows/test.yml/badge.svg?branch=main&event=push)](https://github.com/foomo/gofuncy/actions/workflows/test.yml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/foomo/gofuncy)](https://goreportcard.com/report/github.com/foomo/gofuncy)
-[![godoc](https://godoc.org/github.com/foomo/gofuncy?status.svg)](https://godoc.org/github.com/foomo/gofuncy)
-[![goreleaser](https://github.com/foomo/gofuncy/actions/workflows/release.yml/badge.svg)](https://github.com/foomo/gofuncy/actions)
+[![GoDoc](https://godoc.org/github.com/foomo/gofuncy?status.svg)](https://godoc.org/github.com/foomo/gofuncy)
+
+<p align="center">
+  <img alt="gofuncy" src="docs/public/logo.png" width="400" height="400"/>
+</p>
+
+# gofuncy
 
 > Stop using `go func`, start using `gofuncy`!
 

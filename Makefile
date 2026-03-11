@@ -96,12 +96,27 @@ generate:
 	@echo "〉go generate"
 	@go generate ./...
 
-### Utils
+### Documentation
+
+.PHONY: docs
+## Open docs
+docs:
+	@echo "〉starting docs"
+	@cd docs && bun install && bun run dev
+
+.PHONY: docs.build
+## Open docs
+docs.build:
+	@echo "〉building docs"
+	@cd docs && bun install && bun run build
 
 .PHONY: godocs
 ## Open go docs
 godocs:
+	@echo "〉starting go docs"
 	@go doc -http
+
+### Utils
 
 .PHONY: help
 ## Show help text

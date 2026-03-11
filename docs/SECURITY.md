@@ -41,5 +41,5 @@ following responsible disclosure principles and these guidelines:
 
 If you have any questions, please reach out directly by [creating an issue][new-issue].
 
-[new-issue]: https://github.com/foomo/gofunky/issues/new/choose
-[new-sec-issue]: https://github.com/foomo/gofunky/security/advisories/new
+[new-issue]: https://github.com/foomo/gofuncy/issues/new/choose
+[new-sec-issue]: https://github.com/foomo/gofuncy/security/advisories/new

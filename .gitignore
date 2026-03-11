@@ -1,14 +1,17 @@
 .*
 *.zip
 *.tar
+*.tgz
+*.pem
 *.out
 *.log
-/bin/
-/tmp/
+bin/
+dist/
+tmp/
 
 ## Git
-!.gitkeep
 !.gitignore
+!.gitkeep
 
 ## GitHub
 !.github/
@@ -16,10 +19,26 @@
 ## Editorconfig
 !.editorconfig
 
-## Husky
-!.husky/
-!.husky.yaml
+## Docker
+!.dockerignore
 
-## Golang
-!.golangci.yml
-!.goreleaser.yml
+## Lefthook
+!.lefthook.yaml
+
+## Node ##
+**/node_modules/
+
+## TypeScript
+*.tsbuildinfo
+
+### Golang
+/go.work
+/go.work.sum
+!.golangci.yaml
+!.goreleaser.yaml
+
+## Mise
+!.mise.toml
+
+## Vitepress
+!docs/.vitepress

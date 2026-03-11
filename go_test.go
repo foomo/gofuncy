@@ -51,7 +51,9 @@ func ExampleGo_error() {
 
 func TestGo(t *testing.T) {
 	t.Parallel()
+
 	var called atomic.Bool
+
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			called.Store(true)
@@ -83,6 +85,7 @@ func TestGo_error(t *testing.T) {
 
 func TestGo_withName(t *testing.T) {
 	t.Parallel()
+
 	expected := "gofuncy_test"
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {

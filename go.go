@@ -109,10 +109,12 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 
 	// create telemetry if enabled
 	var traceAttrs []attribute.KeyValue
+
 	if o.telemetryEnabled {
 		if o.meter == nil {
 			o.meter = otel.Meter("github.com/foomo/gofuncy")
 		}
+
 		if o.tracer == nil {
 			o.tracer = otel.Tracer("github.com/foomo/gofuncy")
 		}
@@ -149,6 +151,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 	}
 
 	delay := time.Now()
+
 	errChan := make(chan error, 1)
 	go func(ctx context.Context, o *Options, errChan chan<- error) {
 		defer close(errChan)
@@ -159,6 +162,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}
 
 		var err error
+
 		start := time.Now()
 		routineName := NameFromContext(ctx)
 
@@ -179,11 +183,13 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 					zap.String("span_id", span.SpanContext().SpanID().String()),
 				)
 			}
+
 			defer func() {
 				if err != nil {
 					span.RecordError(err)
 					span.SetStatus(codes.Error, err.Error())
 				}
+
 				span.End()
 			}()
 		}
@@ -191,6 +197,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		l.Log(o.level, "go",
 			zap.Duration("delay", time.Since(delay).Round(time.Millisecond)),
 		)
+
 		defer func() {
 			l.Log(o.level, "stop",
 				zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
@@ -203,6 +210,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			o.runningMetric.Add(ctx, 1, metricAttrs)
 			defer o.runningMetric.Add(ctx, -1, metricAttrs)
 		}
+
 		if o.durationMetric != nil {
 			defer func() {
 				o.durationMetric.Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
@@ -210,8 +218,10 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 				))
 			}()
 		}
+
 		ctx = injectParentIntoContext(ctx, NameFromContext(ctx))
 		ctx = injectNameIntoContext(ctx, o.name)
+
 		err = fn(ctx)
 		errChan <- err
 	}(ctx, o, errChan)

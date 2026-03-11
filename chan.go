@@ -160,6 +160,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		if inst.meter == nil {
 			inst.meter = otel.Meter("github.com/foomo/gofuncy")
 		}
+
 		if inst.tracer == nil {
 			inst.tracer = otel.Tracer("github.com/foomo/gofuncy")
 		}
@@ -209,6 +210,7 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 	l := g.l.With(
 		zap.String("gofuncy_name", routineName),
 	)
+
 	var span trace.Span
 	if g.tracer != nil {
 		ctx, span = g.tracer.Start(ctx, "GOFUNCY receive."+g.name, trace.WithAttributes(
@@ -232,7 +234,9 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 		}
 		defer span.End()
 	}
+
 	out := make(chan T, 1)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -243,16 +247,20 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 				close(out)
 				return out
 			}
+
 			if g.messagesCountMetric != nil {
 				g.messagesCountMetric.Add(ctx, -1, metric.WithAttributes(
 					attribute.String("chan_name", g.name)),
 				)
 			}
+
 			l.Debug("received messages",
 				zap.String("gofuncy_sender", msg.Sender()),
 				zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
 			)
+
 			out <- msg.value
+
 			return out
 		}
 	}
@@ -318,11 +326,13 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 				span.AddEvent("message", trace.WithAttributes(attribute.String("value", string(v))))
 			}
 		}
+
 		return ret
 	}
 
 	for _, data := range values {
 		s := time.Now()
+
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
@@ -347,8 +357,11 @@ func (g *Chan[T]) Close() {
 	if g.isClosed.Load() {
 		return
 	}
+
 	g.isClosed.Store(true)
+
 	g.closing <- struct{}{}
+
 	close(g.channel)
 	g.l.Debug("closed")
 }

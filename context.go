@@ -7,7 +7,7 @@ import (
 type contextKey string
 
 type Context struct {
-	context.Context
+	context.Context //nolint:containedctx
 }
 
 const (
@@ -49,6 +49,7 @@ func NameFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(contextKeyName).(string); ok {
 		return value
 	}
+
 	return NameNoName
 }
 
@@ -60,16 +61,18 @@ func ParentFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(contextKeyParent).(string); ok {
 		return value
 	}
+
 	return ""
 }
 
-func injectSenderIntoContext(ctx context.Context, name string) context.Context {
-	return context.WithValue(ctx, contextKeySender, name)
-}
+// func injectSenderIntoContext(ctx context.Context, name string) context.Context {
+// 	return context.WithValue(ctx, contextKeySender, name)
+// }
 
 func SenderFromContext(ctx context.Context) string {
 	if value, ok := ctx.Value(contextKeySender).(string); ok {
 		return value
 	}
+
 	return ""
 }

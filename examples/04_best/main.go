@@ -2,25 +2,20 @@ package main
 
 import (
 	"context"
-	"fmt"
+	"log/slog"
 	"os"
 	"time"
 
 	"github.com/foomo/gofuncy"
-	"github.com/uptrace/opentelemetry-go-extra/otelzap"
 	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/exporters/stdout/stdoutlog"
 	"go.opentelemetry.io/otel/exporters/stdout/stdoutmetric"
 	"go.opentelemetry.io/otel/exporters/stdout/stdouttrace"
-	"go.opentelemetry.io/otel/log/global"
-	"go.opentelemetry.io/otel/sdk/log"
 	"go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/trace"
-	"go.uber.org/zap"
 )
 
-var meter *metric.MeterProvider
-var tracer *trace.TracerProvider
+var meterProvider *metric.MeterProvider
+var tracerProvider *trace.TracerProvider
 
 func init() {
 	{
@@ -28,55 +23,37 @@ func init() {
 			stdoutmetric.WithPrettyPrint(),
 			stdoutmetric.WithWriter(os.Stdout),
 		)
-		meter = metric.NewMeterProvider(
+		meterProvider = metric.NewMeterProvider(
 			metric.WithReader(metric.NewPeriodicReader(exp)),
 		)
-		otel.SetMeterProvider(meter)
+		otel.SetMeterProvider(meterProvider)
 	}
 	{
 		exp, _ := stdouttrace.New(stdouttrace.WithPrettyPrint())
-		tracer = trace.NewTracerProvider(
+		tracerProvider = trace.NewTracerProvider(
 			trace.WithSampler(trace.AlwaysSample()),
 			trace.WithBatcher(exp),
 		)
-		otel.SetTracerProvider(tracer)
-	}
-	{
-		exp, err := stdoutlog.New()
-		if err != nil {
-			panic(err)
-		}
-
-		processor := log.NewSimpleProcessor(exp)
-		provider := log.NewLoggerProvider(log.WithProcessor(processor))
-		defer func() {
-			if err := provider.Shutdown(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-
-		global.SetLoggerProvider(provider)
+		otel.SetTracerProvider(tracerProvider)
 	}
 }
 
 func main() {
-	l := otelzap.New(zap.NewExample())
+	l := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
 	ctx := gofuncy.Ctx(context.Background()).Root()
 
 	go func() {
 		time.Sleep(10 * time.Second)
-		// _ = meter.ForceFlush(context.Background())
-		_ = tracer.ForceFlush(ctx)
+		_ = meterProvider.ForceFlush(context.Background())
+		_ = tracerProvider.ForceFlush(ctx)
 		l.Info("exiting")
 		os.Exit(0)
 	}()
 
 	msg := gofuncy.NewChan[string](
-		// gofuncy.ChannelWithBufferSize[string](5),
 		gofuncy.ChanWithTelemetryEnabled[string](true),
-		gofuncy.ChanWithValueEventsEnabled[string](true),
-		gofuncy.ChanWithValueAttributeEnabled[string](true),
+		gofuncy.ChanWithMessagesAttributeEnabled[string](true),
 	)
 
 	l.Info("start")
@@ -86,7 +63,6 @@ func main() {
 	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTelemetryEnabled(true))
 
 	_ = gofuncy.Go(ctx, receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTelemetryEnabled(true))
-	// _ = receive(l, msg)(ctx)
 
 	time.Sleep(time.Minute)
 }
@@ -94,7 +70,7 @@ func main() {
 func send(msg *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
 		for {
-			if err := msg.Send(ctx, fmt.Sprintf("Hello World")); err != nil {
+			if err := msg.Send(ctx, "Hello World"); err != nil {
 				return err
 			}
 			time.Sleep(300 * time.Millisecond)
@@ -102,15 +78,14 @@ func send(msg *gofuncy.Chan[string]) gofuncy.Func {
 	}
 }
 
-func receive(l *otelzap.Logger, msg *gofuncy.Chan[string]) gofuncy.Func {
+func receive(l *slog.Logger, msg *gofuncy.Chan[string]) gofuncy.Func {
 	return func(ctx context.Context) error {
-		for m := range msg.Receive() {
-			l.Ctx(ctx).Error("received message",
-				zap.String("data", m.Data),
-				zap.String("handler", gofuncy.NameFromContext(ctx)),
-				zap.String("sender", gofuncy.SenderFromContext(m.Context())),
+		for v := range msg.Receive(ctx) {
+			l.InfoContext(ctx, "received message",
+				"data", v,
+				"handler", gofuncy.NameFromContext(ctx),
+				"sender", gofuncy.NameFromContext(ctx),
 			)
-			// fmt.Println(m, len(msg))
 			time.Sleep(time.Second)
 		}
 		return nil

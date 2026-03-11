@@ -1,3 +1,4 @@
+# https://golangci-lint.run/usage/configuration/
 # yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 version: "2"
 
@@ -52,27 +53,19 @@ linters:
 
   # https://golangci-lint.run/docs/linters/
   settings:
+    # https://golangci-lint.run/docs/linters/configuration/#exhaustive
     exhaustive:
       default-signifies-exhaustive: true
-    gocritic:
-      disabled-checks:
-        - assignOp
-        - ifElseChain
-    gomoddirectives:
-      replace-local: true
-      replace-allow-list:
-        - github.com/iancoleman/strcase
+    # https://golangci-lint.run/docs/linters/configuration/#gosec
     gosec:
       severity: medium
       confidence: medium
+    # https://golangci-lint.run/docs/linters/configuration/#revive
     revive:
       rules:
-        - name: exported
-          disabled: true
         - name: package-comments
           disabled: true
   exclusions:
-    generated: lax
     presets:
       - comments
       - common-false-positives
@@ -82,9 +75,9 @@ linters:
       - path: _test\.go
         linters:
           - forbidigo
-          - gosec
     paths:
-      - examples
+      - docs
+      - tmp
 formatters:
   enable:
     - gofmt

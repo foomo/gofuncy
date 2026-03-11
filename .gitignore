@@ -16,14 +16,23 @@ tmp/
 ## GitHub
 !.github/
 
+## Mise
+!.mise.toml
+
+## Lefthook
+!.lefthook.yaml
+
+## VSCode
+!.vscode/
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.default.json
+
 ## Editorconfig
 !.editorconfig
 
 ## Docker
 !.dockerignore
-
-## Lefthook
-!.lefthook.yaml
 
 ## Node ##
 **/node_modules/
@@ -37,8 +46,9 @@ tmp/
 !.golangci.yaml
 !.goreleaser.yaml
 
-## Mise
-!.mise.toml
-
 ## Vitepress
+node_modules/
 !docs/.vitepress
+docs/.vitepress/*
+!docs/.vitepress/theme/
+!docs/.vitepress/config.mts

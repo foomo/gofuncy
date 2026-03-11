@@ -3,6 +3,8 @@ package gofuncy
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"os"
 	"runtime"
 	"sync/atomic"
@@ -11,16 +13,16 @@ import (
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
+
+	"github.com/foomo/gofuncy/semconv"
 )
 
 type (
 	Chan[T any] struct {
-		l     *zap.Logger
-		level zapcore.Level
+		l     *slog.Logger
+		level slog.Level
 		name  string
 		// channel
 		channel chan Message[T]
@@ -60,13 +62,13 @@ func ChanWithBuffer[T any](size int) ChanOption[T] {
 	}
 }
 
-func ChanWithLogger[T any](l *zap.Logger) ChanOption[T] {
+func ChanWithLogger[T any](l *slog.Logger) ChanOption[T] {
 	return func(o *Chan[T]) {
 		o.l = l
 	}
 }
 
-func ChanWithLogLevel[T any](level zapcore.Level) ChanOption[T] {
+func ChanWithLogLevel[T any](level slog.Level) ChanOption[T] {
 	return func(o *Chan[T]) {
 		o.level = level
 	}
@@ -126,15 +128,15 @@ func ChanWithMessagesAttributeEnabled[T any](enabled bool) ChanOption[T] {
 
 func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 	inst := &Chan[T]{
-		l:                          zap.NewNop(),
-		level:                      zapcore.DebugLevel,
+		l:                          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		level:                      slog.LevelDebug,
 		name:                       NameNoName,
 		buffer:                     0,
 		closing:                    make(chan struct{}),
 		countMetricName:            "gofuncy.chans",
 		messagesCountMetricName:    "gofuncy.messages",
 		messagesDurationMetricName: "gofuncy.messages.duration",
-		telemetryEnabled:           os.Getenv("OTEL_ENABLED") == "true",
+		telemetryEnabled:           os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true",
 		messagesAttributeEnabled:   os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true",
 	}
 
@@ -144,9 +146,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		}
 	}
 
-	inst.l = inst.l.Named("gofuncy.chan").With(
-		zap.String("gofuncy_chan_name", inst.name),
-	)
+	inst.l = inst.l.WithGroup("gofuncy.chan").With("gofuncy_chan_name", inst.name)
 
 	// create channel
 	inst.channel = make(chan Message[T], inst.buffer)
@@ -167,16 +167,21 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 			inst.countMetricName,
 			metric.WithDescription("Gofuncy open chan count"),
 		); err != nil {
-			inst.l.Warn("failed to initialize counter", zap.Error(err))
+			inst.l.Warn("failed to initialize counter", "err", err)
 		} else {
 			inst.countMetric = value
+		}
+
+		// Initialize countMetric for this channel
+		if inst.countMetric != nil {
+			inst.countMetric.Add(context.Background(), 1, metric.WithAttributes(semconv.ChanName.String(inst.name)))
 		}
 
 		if value, err := inst.meter.Int64UpDownCounter(
 			inst.messagesCountMetricName,
 			metric.WithDescription("Gofuncy pending message count"),
 		); err != nil {
-			inst.l.Warn("failed to initialize counter", zap.Error(err))
+			inst.l.Warn("failed to initialize counter", "err", err)
 		} else {
 			inst.messagesCountMetric = value
 		}
@@ -186,8 +191,9 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		if value, err := inst.meter.Int64Histogram(
 			inst.messagesDurationMetricName,
 			metric.WithDescription("Gofuncy chan message send duration"),
+			metric.WithUnit("ms"),
 		); err != nil {
-			inst.l.Warn("failed to initialize histogram", zap.Error(err))
+			inst.l.Warn("failed to initialize histogram", "err", err)
 		} else {
 			inst.messagesDurationMetric = value
 		}
@@ -203,29 +209,27 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 	start := time.Now()
 	routineName := NameFromContext(ctx)
-	l := g.l.With(
-		zap.String("gofuncy_name", routineName),
-	)
+	l := g.l.With("gofuncy_name", routineName)
 
 	var span trace.Span
 	if g.tracer != nil {
-		ctx, span = g.tracer.Start(ctx, "GOFUNCY receive."+g.name, trace.WithAttributes(
-			attribute.Int("chan.cap", cap(g.channel)),
-			attribute.Int("chan.size", len(g.channel)),
+		ctx, span = g.tracer.Start(ctx, "gofuncy.chan.receive "+g.name, trace.WithAttributes(
+			semconv.ChanCap.Int(cap(g.channel)),
+			semconv.ChanSize.Int(len(g.channel)),
 		))
 		// add caller
 		if pc, file, line, ok := runtime.Caller(1); ok {
 			span.SetAttributes(
-				semconv.CodeFilepath(file),
-				semconv.CodeLineNumber(line),
-				semconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
+				otelsemconv.CodeFilepath(file),
+				otelsemconv.CodeLineNumber(line),
+				otelsemconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
 			)
 		}
 		// enrich logger
 		if span.IsRecording() {
 			l = l.With(
-				zap.String("trace_id", span.SpanContext().TraceID().String()),
-				zap.String("span_id", span.SpanContext().SpanID().String()),
+				"trace_id", span.SpanContext().TraceID().String(),
+				"span_id", span.SpanContext().SpanID().String(),
 			)
 		}
 		defer span.End()
@@ -245,13 +249,13 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 
 		if g.messagesCountMetric != nil {
 			g.messagesCountMetric.Add(ctx, -1, metric.WithAttributes(
-				attribute.String("chan_name", g.name)),
+				semconv.ChanName.String(g.name)),
 			)
 		}
 
 		l.Debug("received messages",
-			zap.String("gofuncy_sender", msg.Sender()),
-			zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
+			"gofuncy_sender", msg.Sender(),
+			"duration", time.Since(start).Round(time.Millisecond),
 		)
 
 		out <- msg.value
@@ -273,30 +277,30 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 	routineName := NameFromContext(ctx)
 
 	l := g.l.With(
-		zap.Int("messages", len(values)),
-		zap.String("gofuncy_name", routineName),
+		"messages", len(values),
+		"gofuncy_name", routineName,
 	)
 
 	var span trace.Span
 	if g.tracer != nil {
-		ctx, span = g.tracer.Start(ctx, "GOFUNCY send."+g.name, trace.WithAttributes(
-			attribute.Int("chan.cap", cap(g.channel)),
-			attribute.Int("chan.size", len(g.channel)),
+		ctx, span = g.tracer.Start(ctx, "gofuncy.chan.send "+g.name, trace.WithAttributes(
+			semconv.ChanCap.Int(cap(g.channel)),
+			semconv.ChanSize.Int(len(g.channel)),
 			attribute.Int("messages.total", len(values)),
 		))
 		// add caller
 		if pc, file, line, ok := runtime.Caller(1); ok {
 			span.SetAttributes(
-				semconv.CodeFilepath(file),
-				semconv.CodeLineNumber(line),
-				semconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
+				otelsemconv.CodeFilepath(file),
+				otelsemconv.CodeLineNumber(line),
+				otelsemconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
 			)
 		}
 		// enrich logger
 		if span.IsRecording() {
 			l = l.With(
-				zap.String("trace_id", span.SpanContext().TraceID().String()),
-				zap.String("span_id", span.SpanContext().SpanID().String()),
+				"trace_id", span.SpanContext().TraceID().String(),
+				"span_id", span.SpanContext().SpanID().String(),
 			)
 		}
 		defer span.End()
@@ -304,7 +308,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 
 	if g.messagesCountMetric != nil {
 		g.messagesCountMetric.Add(ctx, int64(len(values)), metric.WithAttributes(
-			attribute.String("chan_name", g.name)),
+			semconv.ChanName.String(g.name)),
 		)
 	}
 
@@ -315,7 +319,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 		}
 		if g.tracer != nil && g.messagesAttributeEnabled {
 			if v, err := json.Marshal(value); err != nil {
-				l.Warn("failed to marshal message value", zap.Error(err))
+				l.Warn("failed to marshal message value", "err", err)
 			} else {
 				span.AddEvent("message", trace.WithAttributes(attribute.String("value", string(v))))
 			}
@@ -334,13 +338,15 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 			return ErrChanClosed
 		case g.channel <- message(ctx, span, data):
 			if g.messagesDurationMetric != nil {
-				g.messagesDurationMetric.Record(ctx, time.Since(s).Milliseconds())
+				g.messagesDurationMetric.Record(ctx, time.Since(s).Milliseconds(), metric.WithAttributes(
+					semconv.ChanName.String(g.name)),
+				)
 			}
 		}
 	}
 
 	l.Debug("sent messages",
-		zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
+		"duration", time.Since(start).Round(time.Millisecond),
 	)
 
 	return nil
@@ -350,6 +356,10 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 func (g *Chan[T]) Close() {
 	if !g.isClosed.CompareAndSwap(false, true) {
 		return
+	}
+
+	if g.countMetric != nil {
+		g.countMetric.Add(context.Background(), -1, metric.WithAttributes(semconv.ChanName.String(g.name)))
 	}
 
 	close(g.closing)

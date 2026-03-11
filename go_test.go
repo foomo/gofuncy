@@ -3,6 +3,7 @@ package gofuncy_test
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 	"testing"
 
@@ -11,6 +12,42 @@ import (
 	"github.com/stretchr/testify/require"
 	"go.uber.org/zap/zaptest"
 )
+
+func ExampleGo() {
+	ctx := gofuncy.Ctx(context.Background()).Root()
+
+	errChan := gofuncy.Go(ctx, func(ctx context.Context) error {
+		fmt.Println("hello")
+		return nil
+	})
+
+	if err := <-errChan; err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("ok")
+	}
+
+	// Output:
+	// hello
+	// ok
+}
+
+func ExampleGo_error() {
+	ctx := gofuncy.Ctx(context.Background()).Root()
+
+	errChan := gofuncy.Go(ctx, func(ctx context.Context) error {
+		return errors.New("sth went wrong")
+	})
+
+	if err := <-errChan; err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println("ok")
+	}
+
+	// Output:
+	// sth went wrong
+}
 
 func TestGo(t *testing.T) {
 	t.Parallel()
@@ -26,18 +63,25 @@ func TestGo(t *testing.T) {
 	assert.True(t, called.Load())
 }
 
-func TestGo_Error(t *testing.T) {
+func TestGo_error(t *testing.T) {
 	t.Parallel()
-	expected := errors.New("error")
+
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			return expected
+			return errors.New("ups")
 		},
 	)
-	assert.ErrorIs(t, expected, <-errChan)
+
+	err, ok := <-errChan
+	assert.True(t, ok)
+	require.Error(t, err)
+
+	err, ok = <-errChan
+	assert.False(t, ok)
+	require.NoError(t, err)
 }
 
-func TestGo_WithName(t *testing.T) {
+func TestGo_withName(t *testing.T) {
 	t.Parallel()
 	expected := "gofuncy_test"
 	errChan := gofuncy.Go(t.Context(),
@@ -48,4 +92,32 @@ func TestGo_WithName(t *testing.T) {
 		gofuncy.WithName(expected),
 	)
 	assert.NoError(t, <-errChan)
+}
+
+func TestGo_withContextCancel(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	errChan := gofuncy.Go(ctx,
+		func(ctx context.Context) error {
+			return nil
+		},
+	)
+
+	require.ErrorIs(t, <-errChan, context.Canceled)
+}
+
+func TestGo_withContextCanceled(t *testing.T) {
+	t.Parallel()
+	ctx, cancel := context.WithCancel(t.Context())
+	errChan := gofuncy.Go(ctx,
+		func(ctx context.Context) error {
+			cancel()
+			return ctx.Err()
+		},
+	)
+
+	require.ErrorIs(t, <-errChan, context.Canceled)
 }

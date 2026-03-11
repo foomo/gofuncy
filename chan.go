@@ -3,9 +3,7 @@ package gofuncy
 import (
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
-	"os"
 	"runtime"
 	"sync/atomic"
 	"time"
@@ -128,7 +126,7 @@ func ChanWithMessagesAttributeEnabled[T any](enabled bool) ChanOption[T] {
 
 func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 	inst := &Chan[T]{
-		l:                          slog.New(slog.NewTextHandler(io.Discard, nil)),
+		l:                          discardLogger,
 		level:                      slog.LevelDebug,
 		name:                       NameNoName,
 		buffer:                     0,
@@ -136,8 +134,8 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		countMetricName:            "gofuncy.chans",
 		messagesCountMetricName:    "gofuncy.messages",
 		messagesDurationMetricName: "gofuncy.messages.duration",
-		telemetryEnabled:           os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true",
-		messagesAttributeEnabled:   os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true",
+		telemetryEnabled:           defaultTelemetryEnabled,
+		messagesAttributeEnabled:   defaultMessagesAttributeEnabled,
 	}
 
 	for _, opt := range opts {

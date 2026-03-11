@@ -2,7 +2,6 @@ package gofuncy
 
 import (
 	"context"
-	"io"
 	"log/slog"
 	"os"
 	"runtime"
@@ -16,6 +15,30 @@ import (
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/foomo/gofuncy/semconv"
+)
+
+type noopHandler struct{}
+
+func (noopHandler) Enabled(context.Context, slog.Level) bool {
+	return false
+}
+
+func (noopHandler) Handle(context.Context, slog.Record) error {
+	return nil
+}
+
+func (h noopHandler) WithAttrs([]slog.Attr) slog.Handler {
+	return h
+}
+
+func (h noopHandler) WithGroup(string) slog.Handler {
+	return h
+}
+
+var (
+	discardLogger                   = slog.New(noopHandler{})
+	defaultTelemetryEnabled         = os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true"
+	defaultMessagesAttributeEnabled = os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true"
 )
 
 type (
@@ -92,12 +115,12 @@ func WithDurationMetricEnabled(v bool) Option {
 
 func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 	o := &options{
-		l:                  slog.New(slog.NewTextHandler(io.Discard, nil)),
+		l:                  discardLogger,
 		name:               NameNoName,
 		level:              slog.LevelDebug,
 		countMetricName:    "gofuncy.goroutines",
 		durationMetricName: "gofuncy.goroutines.duration",
-		telemetryEnabled:   os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true",
+		telemetryEnabled:   defaultTelemetryEnabled,
 	}
 
 	for _, opt := range opts {
@@ -228,8 +251,13 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			}()
 		}
 
-		ctx = injectParentIntoContext(ctx, NameFromContext(ctx))
-		ctx = injectNameIntoContext(ctx, o.name)
+		if parentName := NameFromContext(ctx); parentName != NameNoName {
+			ctx = injectParentIntoContext(ctx, parentName)
+		}
+
+		if o.name != NameNoName {
+			ctx = injectNameIntoContext(ctx, o.name)
+		}
 
 		err = fn(ctx)
 		errChan <- err

@@ -52,17 +52,18 @@ func main() {
 	}()
 
 	msg := gofuncy.NewChan[string](
-		gofuncy.ChanWithTelemetryEnabled[string](true),
+		gofuncy.ChanWithTracing[string](),
+		gofuncy.ChanWithCounterMetric[string](),
 		gofuncy.ChanWithMessagesAttributeEnabled[string](true),
 	)
 
 	l.Info("start")
 
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTelemetryEnabled(true))
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTelemetryEnabled(true))
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTracing())
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTracing())
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTracing())
 
-	_ = gofuncy.Go(ctx, receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTracing())
 
 	time.Sleep(time.Minute)
 }

@@ -3,7 +3,6 @@ package gofuncy_test
 import (
 	"context"
 	"fmt"
-	"log/slog"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -11,8 +10,6 @@ import (
 	"github.com/foomo/gofuncy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/metric/noop"
-	tracenoop "go.opentelemetry.io/otel/trace/noop"
 )
 
 func TestGo_withName(t *testing.T) {
@@ -74,23 +71,6 @@ func TestGo_withNilOption(t *testing.T) {
 	assert.True(t, called.Load())
 }
 
-func TestGo_withLogLevel(t *testing.T) {
-	t.Parallel()
-
-	var called atomic.Bool
-
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			called.Store(true)
-			return nil
-		},
-		gofuncy.WithLogLevel(slog.LevelWarn),
-	)
-
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
-}
-
 func TestGo_withCountMetricName(t *testing.T) {
 	t.Parallel()
 
@@ -101,7 +81,6 @@ func TestGo_withCountMetricName(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithCountMetricName("custom.counter"),
 	)
 
 	require.NoError(t, <-errChan)
@@ -118,8 +97,7 @@ func TestGo_withDurationMetricEnabled(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithMeter(noop.NewMeterProvider().Meter("test")),
-		gofuncy.WithDurationMetricEnabled(true),
+		gofuncy.WithDurationMetric(),
 	)
 
 	require.NoError(t, <-errChan)
@@ -131,13 +109,11 @@ func TestGo_withMeter(t *testing.T) {
 
 	var called atomic.Bool
 
-	meterProvider := noop.NewMeterProvider()
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithMeter(meterProvider.Meter("test")),
 	)
 
 	require.NoError(t, <-errChan)
@@ -149,13 +125,11 @@ func TestGo_withTracer(t *testing.T) {
 
 	var called atomic.Bool
 
-	tracerProvider := tracenoop.NewTracerProvider()
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithTracer(tracerProvider.Tracer("test")),
 	)
 
 	require.NoError(t, <-errChan)

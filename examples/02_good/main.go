@@ -15,7 +15,7 @@ func main() {
 
 	ctx := gofuncy.Ctx(context.Background()).Root()
 
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTelemetryEnabled(true))
+	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTracing())
 	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"))
 
 	_ = gofuncy.Go(ctx, receive(msg), gofuncy.WithName("receiver-c"))

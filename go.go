@@ -8,36 +8,28 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
-	otelSemconv "go.opentelemetry.io/otel/semconv/v1.30.0"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.30.0"
 	"go.opentelemetry.io/otel/trace"
 
 	"github.com/foomo/gofuncy/semconv"
 )
 
 var (
-	defaultTelemetryEnabled         = os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true"
 	defaultMessagesAttributeEnabled = os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true"
 	optionsPool                     = sync.Pool{New: func() any { return &options{} }}
 )
 
 type (
 	options struct {
-		l     *slog.Logger
-		level slog.Level
-		name  string
+		l    *slog.Logger
+		name string
 		// telemetry
-		meter                 metric.Meter
-		tracer                trace.Tracer
-		runningMetric         metric.Int64UpDownCounter
-		countMetricName       string
-		durationMetric        metric.Int64Histogram
-		durationMetricName    string
+		tracingEnabled        bool
+		counterMetricEnabled  bool
 		durationMetricEnabled bool
-		telemetryEnabled      bool
 	}
 	Option func(*options)
 )
@@ -54,65 +46,35 @@ func WithLogger(l *slog.Logger) Option {
 	}
 }
 
-func WithLogLevel(level slog.Level) Option {
+func WithTracing() Option {
 	return func(o *options) {
-		o.level = level
+		o.tracingEnabled = true
 	}
 }
 
-func WithTelemetryEnabled(enabled bool) Option {
+func WithCounterMetric() Option {
 	return func(o *options) {
-		o.telemetryEnabled = enabled
+		o.counterMetricEnabled = true
 	}
 }
 
-func WithMeter(meter metric.Meter) Option {
+func WithDurationMetric() Option {
 	return func(o *options) {
-		o.meter = meter
-	}
-}
-
-func WithTracer(tracer trace.Tracer) Option {
-	return func(o *options) {
-		o.tracer = tracer
-	}
-}
-
-func WithCountMetricName(name string) Option {
-	return func(o *options) {
-		o.countMetricName = name
-	}
-}
-
-func WithDurationMetricName(name string) Option {
-	return func(o *options) {
-		o.durationMetricName = name
-	}
-}
-
-func WithDurationMetricEnabled(v bool) Option {
-	return func(o *options) {
-		o.durationMetricEnabled = v
+		o.durationMetricEnabled = true
 	}
 }
 
 // reset clears all fields in options for reuse from pool (OPT 6)
 func (o *options) reset() {
 	o.l = nil
-	o.level = slog.LevelDebug
 	o.name = NameNoName
-	o.meter = nil
-	o.tracer = nil
-	o.runningMetric = nil
-	o.countMetricName = "gofuncy.goroutines"
-	o.durationMetric = nil
-	o.durationMetricName = "gofuncy.goroutines.duration"
+	o.tracingEnabled = false
+	o.counterMetricEnabled = false
 	o.durationMetricEnabled = false
-	o.telemetryEnabled = defaultTelemetryEnabled
 }
 
 func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
-	// OPT 6: get options from pool, reset to defaults
+	// get options from pool, reset to defaults
 	var o *options
 	if opt, ok := optionsPool.Get().(*options); ok {
 		o = opt
@@ -137,48 +99,14 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 	// create telemetry if enabled
 	var traceAttrs []attribute.KeyValue
 
-	if o.telemetryEnabled {
-		if o.meter == nil {
-			o.meter = otel.Meter("github.com/foomo/gofuncy")
-		}
-
-		if o.tracer == nil {
-			o.tracer = otel.Tracer("github.com/foomo/gofuncy")
-		}
+	if o.tracingEnabled {
 		// add caller
 		if pc, file, line, ok := runtime.Caller(1); ok {
 			traceAttrs = append(traceAttrs,
-				otelSemconv.CodeFilepath(file),
-				otelSemconv.CodeLineNumber(line),
-				otelSemconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
+				otelsemconv.CodeFilepath(file),
+				otelsemconv.CodeLineNumber(line),
+				otelsemconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
 			)
-		}
-	}
-
-	if o.meter != nil {
-		if value, err := o.meter.Int64UpDownCounter(
-			o.countMetricName,
-			metric.WithDescription("Gofuncy running go routine count"),
-		); err != nil {
-			if l != nil {
-				l.Warn("failed to initialize counter", "err", err)
-			}
-		} else {
-			o.runningMetric = value
-		}
-	}
-
-	if o.meter != nil && o.durationMetricEnabled {
-		if value, err := o.meter.Int64Histogram(
-			o.durationMetricName,
-			metric.WithDescription("Gofuncy go routine duration histogram"),
-			metric.WithUnit("ms"),
-		); err != nil {
-			if l != nil {
-				l.Warn("failed to initialize histogram", "err", err)
-			}
-		} else {
-			o.durationMetric = value
 		}
 	}
 
@@ -204,12 +132,12 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 				l = l.With("gofuncy_parent", routineName)
 			}
 
-			traceAttrs = append(traceAttrs, attribute.String("gofuncy.routine.parent", routineName))
+			traceAttrs = append(traceAttrs, semconv.RoutineParent(routineName))
 		}
 
 		var span trace.Span
-		if o.tracer != nil {
-			ctx, span = o.tracer.Start(ctx,
+		if o.tracingEnabled {
+			ctx, span = tracer.Start(ctx,
 				"gofuncy.go "+o.name,
 				trace.WithAttributes(traceAttrs...),
 			)
@@ -231,7 +159,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}
 
 		if l != nil {
-			l.Log(ctx, o.level, "go",
+			l.DebugContext(ctx, "go",
 				"delay", time.Since(delay).Round(time.Millisecond),
 			)
 		}
@@ -239,28 +167,33 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		defer func() {
 			if l != nil {
 				if err != nil {
-					l.Log(ctx, o.level, "stop",
+					l.WarnContext(ctx, "stop",
 						"duration", time.Since(start).Round(time.Millisecond),
 						"err", err,
 					)
 				} else {
-					l.Log(ctx, o.level, "stop",
+					l.DebugContext(ctx, "stop",
 						"duration", time.Since(start).Round(time.Millisecond),
 					)
 				}
 			}
 		}()
-		// create telemetry if enabled (guard to avoid alloc when metrics are nil)
-		if o.runningMetric != nil || o.durationMetric != nil {
-			metricAttrs := metric.WithAttributes(semconv.RoutineName.String(o.name))
-			if o.runningMetric != nil {
-				o.runningMetric.Add(ctx, 1, metricAttrs)
-				defer o.runningMetric.Add(ctx, -1, metricAttrs)
+		// create metrics if enabled (guard to avoid alloc when metrics are nil)
+		if o.counterMetricEnabled || o.durationMetricEnabled {
+			metricAttrs := metric.WithAttributes(semconv.RoutineName(o.name))
+
+			if o.counterMetricEnabled {
+				counter := goroutinesCounter()
+				counter.Add(ctx, 1, metricAttrs)
+
+				defer func() {
+					counter.Add(ctx, -1, metricAttrs)
+				}()
 			}
 
-			if o.durationMetric != nil {
+			if o.durationMetricEnabled {
 				defer func() {
-					o.durationMetric.Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
+					goroutinesDurationHistogram().Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
 						attribute.Bool("error", err != nil),
 					))
 				}()

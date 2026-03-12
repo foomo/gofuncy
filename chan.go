@@ -91,7 +91,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 		name:                     NameNoName,
 		buffer:                   0,
 		closing:                  make(chan struct{}),
-		messagesAttributeEnabled: defaultMessagesAttributeEnabled,
+		messagesAttributeEnabled: false,
 	}
 
 	for _, opt := range opts {
@@ -249,7 +249,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 			return ErrChanClosed
 		case g.channel <- g.newMessage(span, l, routineName, data):
 			if g.messagesDurationMetricEnabled {
-				messagesDurationHistogram().Record(ctx, time.Since(s).Milliseconds(), metric.WithAttributes(
+				messagesDurationHistogram().Record(ctx, time.Since(s).Truncate(time.Millisecond).Seconds(), metric.WithAttributes(
 					semconv.ChanName(g.name)),
 				)
 			}

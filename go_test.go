@@ -10,11 +10,14 @@ import (
 	"github.com/foomo/gofuncy"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/goleak"
 )
 
-func TestGo_withName(t *testing.T) {
-	t.Parallel()
+func TestMain(m *testing.M) {
+	goleak.VerifyTestMain(Run(m))
+}
 
+func TestGo_withName(t *testing.T) {
 	expected := "gofuncy_test"
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
@@ -27,8 +30,6 @@ func TestGo_withName(t *testing.T) {
 }
 
 func TestGo_withContextCancel(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -42,7 +43,6 @@ func TestGo_withContextCancel(t *testing.T) {
 }
 
 func TestGo_withContextCanceled(t *testing.T) {
-	t.Parallel()
 	ctx, cancel := context.WithCancel(t.Context())
 	errChan := gofuncy.Go(ctx,
 		func(ctx context.Context) error {
@@ -55,8 +55,6 @@ func TestGo_withContextCanceled(t *testing.T) {
 }
 
 func TestGo_withNilOption(t *testing.T) {
-	t.Parallel()
-
 	var called atomic.Bool
 
 	errChan := gofuncy.Go(t.Context(),
@@ -71,25 +69,7 @@ func TestGo_withNilOption(t *testing.T) {
 	assert.True(t, called.Load())
 }
 
-func TestGo_withCountMetricName(t *testing.T) {
-	t.Parallel()
-
-	var called atomic.Bool
-
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			called.Store(true)
-			return nil
-		},
-	)
-
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
-}
-
-func TestGo_withDurationMetricEnabled(t *testing.T) {
-	t.Parallel()
-
+func TestGo_withDurationMetric(t *testing.T) {
 	var called atomic.Bool
 
 	errChan := gofuncy.Go(t.Context(),
@@ -104,41 +84,7 @@ func TestGo_withDurationMetricEnabled(t *testing.T) {
 	assert.True(t, called.Load())
 }
 
-func TestGo_withMeter(t *testing.T) {
-	t.Parallel()
-
-	var called atomic.Bool
-
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			called.Store(true)
-			return nil
-		},
-	)
-
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
-}
-
-func TestGo_withTracer(t *testing.T) {
-	t.Parallel()
-
-	var called atomic.Bool
-
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			called.Store(true)
-			return nil
-		},
-	)
-
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
-}
-
 func TestGo_contextNamePropagation(t *testing.T) {
-	t.Parallel()
-
 	parentName := "parent-routine"
 
 	var childName string
@@ -173,8 +119,6 @@ func TestGo_contextNamePropagation(t *testing.T) {
 }
 
 func TestGo_concurrent(t *testing.T) {
-	t.Parallel()
-
 	const numGoroutines = 100
 
 	var wg sync.WaitGroup

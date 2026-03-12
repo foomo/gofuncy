@@ -3,8 +3,8 @@ package gofuncy
 import (
 	"context"
 	"log/slog"
-	"os"
 	"runtime"
+	"strings"
 	"sync"
 	"time"
 
@@ -18,8 +18,7 @@ import (
 )
 
 var (
-	defaultMessagesAttributeEnabled = os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true"
-	optionsPool                     = sync.Pool{New: func() any { return &options{} }}
+	optionsPool = sync.Pool{New: func() any { return &options{} }}
 )
 
 type (
@@ -96,8 +95,10 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		l = o.l.WithGroup("gofuncy.go").With("gofuncy_name", o.name)
 	}
 
-	// create telemetry if enabled
-	var traceAttrs []attribute.KeyValue
+	// create telemetry if enabled — use stack-allocated array to avoid heap alloc
+	var traceAttrsBuf [4]attribute.KeyValue
+
+	traceAttrs := traceAttrsBuf[:0]
 
 	if o.tracingEnabled {
 		// add caller
@@ -110,12 +111,16 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}
 	}
 
-	delay := time.Now()
+	// only capture delay when logger is set
+	var delay time.Time
+	if l != nil {
+		delay = time.Now()
+	}
 
 	errChan := make(chan error, 1)
 	go func(ctx context.Context, o *options, errChan chan<- error) {
 		defer close(errChan)
-		defer optionsPool.Put(o) // OPT 6: return to pool when done
+		defer optionsPool.Put(o)
 
 		if ctx.Err() != nil {
 			errChan <- ctx.Err()
@@ -136,9 +141,14 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}
 
 		var span trace.Span
+
 		if o.tracingEnabled {
+			var sb strings.Builder
+			sb.WriteString("gofuncy.go ")
+			sb.WriteString(o.name)
+
 			ctx, span = tracer.Start(ctx,
-				"gofuncy.go "+o.name,
+				sb.String(),
 				trace.WithAttributes(traceAttrs...),
 			)
 			if span.IsRecording() && l != nil {
@@ -178,6 +188,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 				}
 			}
 		}()
+
 		// create metrics if enabled (guard to avoid alloc when metrics are nil)
 		if o.counterMetricEnabled || o.durationMetricEnabled {
 			metricAttrs := metric.WithAttributes(semconv.RoutineName(o.name))
@@ -192,20 +203,30 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			}
 
 			if o.durationMetricEnabled {
+				// pre-compute error attribute options to avoid alloc in defer
+				metricAttrsOk := metric.WithAttributes(semconv.RoutineName(o.name), attribute.Bool("error", false))
+				metricAttrsErr := metric.WithAttributes(semconv.RoutineName(o.name), attribute.Bool("error", true))
+
 				defer func() {
-					goroutinesDurationHistogram().Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
-						attribute.Bool("error", err != nil),
-					))
+					if err != nil {
+						goroutinesDurationHistogram().Record(ctx, time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsErr)
+					} else {
+						goroutinesDurationHistogram().Record(ctx, time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsOk)
+					}
 				}()
 			}
 		}
 
-		// OPT 3: reuse routineName from earlier lookup instead of calling NameFromContext again
-		if routineName != NameNoName {
-			ctx = injectParentIntoContext(ctx, routineName)
-		}
+		// combine parent + name into single context.WithValue when both are needed
+		hasParent := routineName != NameNoName
+		hasName := o.name != NameNoName
 
-		if o.name != NameNoName {
+		switch {
+		case hasParent && hasName:
+			ctx = injectRoutineIntoContext(ctx, o.name, routineName)
+		case hasParent:
+			ctx = injectParentIntoContext(ctx, routineName)
+		case hasName:
 			ctx = injectNameIntoContext(ctx, o.name)
 		}
 

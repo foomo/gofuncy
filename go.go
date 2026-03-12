@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"os"
 	"runtime"
+	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -17,28 +18,10 @@ import (
 	"github.com/foomo/gofuncy/semconv"
 )
 
-type noopHandler struct{}
-
-func (noopHandler) Enabled(context.Context, slog.Level) bool {
-	return false
-}
-
-func (noopHandler) Handle(context.Context, slog.Record) error {
-	return nil
-}
-
-func (h noopHandler) WithAttrs([]slog.Attr) slog.Handler {
-	return h
-}
-
-func (h noopHandler) WithGroup(string) slog.Handler {
-	return h
-}
-
 var (
-	discardLogger                   = slog.New(noopHandler{})
 	defaultTelemetryEnabled         = os.Getenv("GOFUNCY_TELEMETRY_ENABLED") == "true"
 	defaultMessagesAttributeEnabled = os.Getenv("GOFUNCY_MESSAGES_ATTRIBUTE_ENABLED") == "true"
+	optionsPool                     = sync.Pool{New: func() any { return &options{} }}
 )
 
 type (
@@ -113,15 +96,31 @@ func WithDurationMetricEnabled(v bool) Option {
 	}
 }
 
+// reset clears all fields in options for reuse from pool (OPT 6)
+func (o *options) reset() {
+	o.l = nil
+	o.level = slog.LevelDebug
+	o.name = NameNoName
+	o.meter = nil
+	o.tracer = nil
+	o.runningMetric = nil
+	o.countMetricName = "gofuncy.goroutines"
+	o.durationMetric = nil
+	o.durationMetricName = "gofuncy.goroutines.duration"
+	o.durationMetricEnabled = false
+	o.telemetryEnabled = defaultTelemetryEnabled
+}
+
 func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
-	o := &options{
-		l:                  discardLogger,
-		name:               NameNoName,
-		level:              slog.LevelDebug,
-		countMetricName:    "gofuncy.goroutines",
-		durationMetricName: "gofuncy.goroutines.duration",
-		telemetryEnabled:   defaultTelemetryEnabled,
+	// OPT 6: get options from pool, reset to defaults
+	var o *options
+	if opt, ok := optionsPool.Get().(*options); ok {
+		o = opt
+	} else {
+		o = &options{}
 	}
+
+	o.reset()
 
 	for _, opt := range opts {
 		if opt != nil {
@@ -129,8 +128,11 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}
 	}
 
-	// create logger
-	l := o.l.WithGroup("gofuncy.go").With("gofuncy_name", o.name)
+	// create logger (only if provided, avoid allocation)
+	var l *slog.Logger
+	if o.l != nil {
+		l = o.l.WithGroup("gofuncy.go").With("gofuncy_name", o.name)
+	}
 
 	// create telemetry if enabled
 	var traceAttrs []attribute.KeyValue
@@ -158,7 +160,9 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			o.countMetricName,
 			metric.WithDescription("Gofuncy running go routine count"),
 		); err != nil {
-			l.Warn("failed to initialize counter", "err", err)
+			if l != nil {
+				l.Warn("failed to initialize counter", "err", err)
+			}
 		} else {
 			o.runningMetric = value
 		}
@@ -170,7 +174,9 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			metric.WithDescription("Gofuncy go routine duration histogram"),
 			metric.WithUnit("ms"),
 		); err != nil {
-			l.Warn("failed to initialize histogram", "err", err)
+			if l != nil {
+				l.Warn("failed to initialize histogram", "err", err)
+			}
 		} else {
 			o.durationMetric = value
 		}
@@ -181,6 +187,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 	errChan := make(chan error, 1)
 	go func(ctx context.Context, o *options, errChan chan<- error) {
 		defer close(errChan)
+		defer optionsPool.Put(o) // OPT 6: return to pool when done
 
 		if ctx.Err() != nil {
 			errChan <- ctx.Err()
@@ -193,7 +200,10 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		routineName := NameFromContext(ctx)
 
 		if routineName != NameNoName {
-			l = l.With("gofuncy_parent", routineName)
+			if l != nil {
+				l = l.With("gofuncy_parent", routineName)
+			}
+
 			traceAttrs = append(traceAttrs, attribute.String("gofuncy.routine.parent", routineName))
 		}
 
@@ -203,7 +213,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 				"gofuncy.go "+o.name,
 				trace.WithAttributes(traceAttrs...),
 			)
-			if span.IsRecording() {
+			if span.IsRecording() && l != nil {
 				l = l.With(
 					"trace_id", span.SpanContext().TraceID().String(),
 					"span_id", span.SpanContext().SpanID().String(),
@@ -220,39 +230,46 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 			}()
 		}
 
-		l.Log(ctx, o.level, "go",
-			"delay", time.Since(delay).Round(time.Millisecond),
-		)
+		if l != nil {
+			l.Log(ctx, o.level, "go",
+				"delay", time.Since(delay).Round(time.Millisecond),
+			)
+		}
 
 		defer func() {
-			if err != nil {
-				l.Log(ctx, o.level, "stop",
-					"duration", time.Since(start).Round(time.Millisecond),
-					"err", err,
-				)
-			} else {
-				l.Log(ctx, o.level, "stop",
-					"duration", time.Since(start).Round(time.Millisecond),
-				)
+			if l != nil {
+				if err != nil {
+					l.Log(ctx, o.level, "stop",
+						"duration", time.Since(start).Round(time.Millisecond),
+						"err", err,
+					)
+				} else {
+					l.Log(ctx, o.level, "stop",
+						"duration", time.Since(start).Round(time.Millisecond),
+					)
+				}
 			}
 		}()
-		// create telemetry if enabled
-		metricAttrs := metric.WithAttributes(semconv.RoutineName.String(o.name))
-		if o.runningMetric != nil {
-			o.runningMetric.Add(ctx, 1, metricAttrs)
-			defer o.runningMetric.Add(ctx, -1, metricAttrs)
+		// create telemetry if enabled (guard to avoid alloc when metrics are nil)
+		if o.runningMetric != nil || o.durationMetric != nil {
+			metricAttrs := metric.WithAttributes(semconv.RoutineName.String(o.name))
+			if o.runningMetric != nil {
+				o.runningMetric.Add(ctx, 1, metricAttrs)
+				defer o.runningMetric.Add(ctx, -1, metricAttrs)
+			}
+
+			if o.durationMetric != nil {
+				defer func() {
+					o.durationMetric.Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
+						attribute.Bool("error", err != nil),
+					))
+				}()
+			}
 		}
 
-		if o.durationMetric != nil {
-			defer func() {
-				o.durationMetric.Record(ctx, time.Since(start).Milliseconds(), metricAttrs, metric.WithAttributes(
-					attribute.Bool("error", err != nil),
-				))
-			}()
-		}
-
-		if parentName := NameFromContext(ctx); parentName != NameNoName {
-			ctx = injectParentIntoContext(ctx, parentName)
+		// OPT 3: reuse routineName from earlier lookup instead of calling NameFromContext again
+		if routineName != NameNoName {
+			ctx = injectParentIntoContext(ctx, routineName)
 		}
 
 		if o.name != NameNoName {

@@ -11,6 +11,7 @@ import (
 
 func BenchmarkGoRaw(b *testing.B) {
 	b.ReportAllocs()
+
 	for b.Loop() {
 		errChan := make(chan error, 1)
 
@@ -26,7 +27,8 @@ func BenchmarkGoRaw(b *testing.B) {
 
 func BenchmarkGo(b *testing.B) {
 	b.ReportAllocs()
-	ctx := gofuncy.Ctx(context.Background()).Root()
+	ctx := gofuncy.Ctx(b.Context()).Root()
+
 	for b.Loop() {
 		errChan := gofuncy.Go(ctx, func(ctx context.Context) error {
 			return nil
@@ -37,7 +39,8 @@ func BenchmarkGo(b *testing.B) {
 
 func BenchmarkGo_withName(b *testing.B) {
 	b.ReportAllocs()
-	ctx := gofuncy.Ctx(context.Background()).Root()
+	ctx := gofuncy.Ctx(b.Context()).Root()
+
 	for b.Loop() {
 		errChan := gofuncy.Go(ctx,
 			func(ctx context.Context) error {
@@ -51,7 +54,7 @@ func BenchmarkGo_withName(b *testing.B) {
 
 func BenchmarkGo_withTelemetry(b *testing.B) {
 	b.ReportAllocs()
-	ctx := gofuncy.Ctx(context.Background()).Root()
+	ctx := gofuncy.Ctx(b.Context()).Root()
 	meterProvider := noop.NewMeterProvider()
 	tracerProvider := tracenoop.NewTracerProvider()
 
@@ -70,6 +73,7 @@ func BenchmarkGo_withTelemetry(b *testing.B) {
 
 func BenchmarkNewChan(b *testing.B) {
 	b.ReportAllocs()
+
 	for b.Loop() {
 		c := gofuncy.NewChan[int]()
 		c.Close()
@@ -78,10 +82,11 @@ func BenchmarkNewChan(b *testing.B) {
 
 func BenchmarkChan_SendReceive(b *testing.B) {
 	b.ReportAllocs()
-	ctx := gofuncy.Ctx(context.Background()).Root()
+	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		c := gofuncy.NewChan[int](gofuncy.ChanWithBuffer[int](1))
+
 		if err := c.Send(ctx, 42); err != nil {
 			b.Fatal(err)
 		}
@@ -91,12 +96,27 @@ func BenchmarkChan_SendReceive(b *testing.B) {
 	}
 }
 
+func BenchmarkChan_ReceiveValue(b *testing.B) {
+	b.ReportAllocs()
+
+	ctx := gofuncy.Ctx(b.Context()).Root()
+	for b.Loop() {
+		c := gofuncy.NewChan[int](gofuncy.ChanWithBuffer[int](1))
+		if err := c.Send(ctx, 42); err != nil {
+			b.Fatal(err)
+		}
+
+		_, _ = c.ReceiveValue(ctx)
+		c.Close()
+	}
+}
+
 func BenchmarkChan_withTelemetry(b *testing.B) {
 	b.ReportAllocs()
-	ctx := gofuncy.Ctx(context.Background()).Root()
+	ctx := gofuncy.Ctx(b.Context()).Root()
 	meterProvider := noop.NewMeterProvider()
-
 	tracerProvider := tracenoop.NewTracerProvider()
+
 	for b.Loop() {
 		c := gofuncy.NewChan[int](
 			gofuncy.ChanWithBuffer[int](1),

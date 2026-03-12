@@ -24,6 +24,7 @@ func TestGo_withName(t *testing.T) {
 			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
 			return nil
 		},
+		gofuncy.WithTracing(),
 		gofuncy.WithName(expected),
 	)
 	assert.NoError(t, <-errChan)

@@ -12,6 +12,8 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
 	"go.opentelemetry.io/otel/sdk/metric/metricdata"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
 var gofunc = func(ctx context.Context) error {
@@ -56,15 +58,33 @@ func Run(m *testing.M) xx {
 
 func (x xx) Run() int {
 	reader := sdkmetric.NewManualReader()
-	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
 
-	otel.SetMeterProvider(provider)
+	otel.SetMeterProvider(meterProvider)
+
+	traceExporter := tracetest.NewInMemoryExporter()
+	tracerProvider := sdktrace.NewTracerProvider(
+		sdktrace.WithSyncer(traceExporter),
+	)
+
+	otel.SetTracerProvider(tracerProvider)
 
 	rm := &metricdata.ResourceMetrics{}
 
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 		defer cancel()
+
+		if err := tracerProvider.ForceFlush(ctx); err != nil {
+			panic(err)
+		}
+
+		spans := traceExporter.GetSpans()
+		if len(spans) > 0 {
+			fmt.Println("\nOTEL TRACES")
+		}
+
+		printScopeTraces(spans)
 
 		err := reader.Collect(ctx, rm)
 		if err != nil {
@@ -77,7 +97,11 @@ func (x xx) Run() int {
 
 		printScopeMetrics(rm)
 
-		if err := provider.Shutdown(ctx); err != nil {
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			panic(err)
+		}
+
+		if err := meterProvider.Shutdown(ctx); err != nil {
 			panic(err)
 		}
 	}()
@@ -96,11 +120,9 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 		for _, v := range a.ToSlice() {
 			parts = append(parts, fmt.Sprintf("%s=%s", string(v.Key), v.Value.Emit()))
 		}
-
 		if len(parts) == 0 {
 			return ""
 		}
-
 		return " {" + strings.Join(parts, ", ") + "}"
 	}
 
@@ -126,39 +148,32 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 				for _, dp := range agg.DataPoints {
 					printHeader(m.Name, "histogram", dp.Attributes)
 
-					if v, ok := dp.Min.Value(); ok {
-						fmt.Printf("  %-12s %12.3f\n", "min:", v)
+					// One-line summary - no unit assumption
+					minV, minOk := dp.Min.Value()
+					maxV, maxOk := dp.Max.Value()
+					avg := 0.0
+					if minOk && maxOk {
+						avg = (minV + maxV) / 2
 					}
 
-					if v, ok := dp.Max.Value(); ok {
-						fmt.Printf("  %-12s %12.3f\n", "max:", v)
-					}
+					fmt.Printf("Summary: Min %.3f, Max %.3f, Avg %.3f, Sum %.3f, Count %d\n\n",
+						minV, maxV, avg, dp.Sum, dp.Count)
 
-					if minV, minOk := dp.Min.Value(); minOk {
-						if maxV, maxOk := dp.Max.Value(); maxOk {
-							fmt.Printf("  %-12s %12.3f\n", "avg:", (minV+maxV)/2)
-						}
-					}
-
-					fmt.Printf("  %-12s %12.3f\n", "sum:", dp.Sum)
-					fmt.Printf("  %-12s %12d\n", "count:", dp.Count)
-
+					// Buckets table - no unit assumption
 					if len(dp.Bounds) > 0 {
-						fmt.Printf("  %-12s", "buckets:")
+						fmt.Println("Buckets:")
+						fmt.Println("┌────────────┬──────────┬─────────┐")
+						fmt.Println("│ Range      │ Count    │ %       │")
+						fmt.Println("├────────────┼──────────┼─────────┤")
 
-						for _, b := range dp.Bounds {
-							fmt.Printf(" %8.1f", b)
+						total := dp.Count
+						for i, b := range dp.Bounds {
+							pct := float64(dp.BucketCounts[i]) / float64(total) * 100
+							fmt.Printf("│ %-10.1f │ %-8d │ %6.1f%% │\n", b, dp.BucketCounts[i], pct)
 						}
-
-						fmt.Println()
-						fmt.Printf("  %-12s", "counts:")
-
-						for i := range dp.Bounds {
-							fmt.Printf(" %8d", dp.BucketCounts[i])
-						}
-
-						fmt.Println()
+						fmt.Println("└────────────┴──────────┴─────────┘")
 					}
+					fmt.Println()
 				}
 			case metricdata.Gauge[int64]:
 				for _, dp := range agg.DataPoints {
@@ -171,6 +186,72 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 					fmt.Printf("  %-12s %.3f\n", "value:", dp.Value)
 				}
 			}
+		}
+	}
+}
+
+func printScopeTraces(spans tracetest.SpanStubs) {
+	const (
+		nameWidth = 40
+		sep       = "─"
+	)
+
+	for _, s := range spans {
+		duration := s.EndTime.Sub(s.StartTime)
+
+		fmt.Printf("\n%-*s [%s] %s\n", nameWidth, s.Name, s.Status.Code, duration)
+		fmt.Printf("%s\n", strings.Repeat(sep, nameWidth+20))
+
+		printedSomething := false
+
+		if s.SpanKind.String() != "" {
+			fmt.Printf("├─ Span Kind: %s\n", s.SpanKind)
+			printedSomething = true
+		}
+
+		if len(s.Attributes) > 0 {
+			fmt.Printf("└─ Attributes:\n")
+			for i, a := range s.Attributes {
+				prefix := "   "
+				if i == 0 {
+					prefix = "   ├─ "
+				} else if i == len(s.Attributes)-1 {
+					prefix = "   └─ "
+				} else {
+					prefix = "   ├─ "
+				}
+				fmt.Printf("%s%s: %s\n", prefix, string(a.Key), a.Value.Emit())
+			}
+			printedSomething = true
+		}
+
+		if len(s.Events) > 0 && printedSomething {
+			fmt.Println("   ")
+			fmt.Printf("   └─ Events:\n")
+			for i, e := range s.Events {
+				prefix := "      "
+				if i == 0 {
+					prefix = "      ├─ "
+				} else if i == len(s.Events)-1 {
+					prefix = "      └─ "
+				} else {
+					prefix = "      ├─ "
+				}
+				fmt.Printf("%s%s", prefix, e.Name)
+
+				if len(e.Attributes) > 0 {
+					parts := make([]string, 0, len(e.Attributes))
+					for _, a := range e.Attributes {
+						parts = append(parts, fmt.Sprintf("%s=%s", string(a.Key), a.Value.Emit()))
+					}
+					fmt.Printf(" {%s}", strings.Join(parts, ", "))
+				}
+				fmt.Println()
+			}
+		}
+
+		if printedSomething || len(s.Events) > 0 {
+			fmt.Println()
 		}
 	}
 }

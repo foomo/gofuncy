@@ -110,7 +110,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 
 	// create counter metric if enabled
 	if inst.counterMetricEnabled {
-		chansCounter().Add(context.Background(), 1, metric.WithAttributes(semconv.ChanName(inst.name)))
+		chansUpDownCounter().Add(context.Background(), 1, metric.WithAttributes(semconv.ChanName(inst.name)))
 	}
 
 	return inst
@@ -353,7 +353,7 @@ func (g *Chan[T]) Close() {
 	}
 
 	if g.counterMetricEnabled {
-		chansCounter().Add(context.Background(), -1, metric.WithAttributes(semconv.ChanName(g.name)))
+		chansUpDownCounter().Add(context.Background(), -1, metric.WithAttributes(semconv.ChanName(g.name)))
 	}
 
 	close(g.closing)

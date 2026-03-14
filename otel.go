@@ -12,9 +12,19 @@ var (
 	tracer = otel.Tracer("github.com/foomo/gofuncy")
 )
 
-var goroutinesCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
-	c, err := meter.Int64UpDownCounter("gofuncy.goroutines.current",
+var goroutinesCounter = sync.OnceValue(func() metric.Int64Counter {
+	c, err := meter.Int64Counter("gofuncy.goroutines.total",
 		metric.WithDescription("Gofuncy running go routine count"))
+	if err != nil {
+		otel.Handle(err)
+	}
+
+	return c
+})
+
+var goroutinesUpDownCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
+	c, err := meter.Int64UpDownCounter("gofuncy.goroutines.current",
+		metric.WithDescription("Gofuncy running go routine up/down count"))
 	if err != nil {
 		otel.Handle(err)
 	}
@@ -34,9 +44,9 @@ var goroutinesDurationHistogram = sync.OnceValue(func() metric.Float64Histogram 
 	return h
 })
 
-var chansCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
+var chansUpDownCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
 	c, err := meter.Int64UpDownCounter("gofuncy.chans.current",
-		metric.WithDescription("Gofuncy open chan count"))
+		metric.WithDescription("Gofuncy open chan up/down count"))
 	if err != nil {
 		otel.Handle(err)
 	}

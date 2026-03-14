@@ -48,19 +48,8 @@ func BenchmarkGo(b *testing.B) {
 	}
 }
 
-type xx struct {
-	m *testing.M
-}
-
-func Run(m *testing.M) xx {
-	return xx{m: m}
-}
-
-func (x xx) Run() int {
-	reader := sdkmetric.NewManualReader()
-	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-
-	otel.SetMeterProvider(meterProvider)
+func ReportTraces(t *testing.T) {
+	t.Helper()
 
 	traceExporter := tracetest.NewInMemoryExporter()
 	tracerProvider := sdktrace.NewTracerProvider(
@@ -69,47 +58,67 @@ func (x xx) Run() int {
 
 	otel.SetTracerProvider(tracerProvider)
 
-	rm := &metricdata.ResourceMetrics{}
-
-	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Second)
 		defer cancel()
 
 		if err := tracerProvider.ForceFlush(ctx); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		spans := traceExporter.GetSpans()
 		if len(spans) > 0 {
-			fmt.Println("\nOTEL TRACES")
+			t.Logf("=== TRACES")
 		}
 
-		printScopeTraces(spans)
+		printScopeTraces(t, spans)
+
+		if err := tracerProvider.Shutdown(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+}
+
+type T interface {
+	Helper()
+	Cleanup(f func())
+	Fatal(args ...any)
+	Logf(format string, args ...any)
+	Context() context.Context
+}
+
+func ReportMetrics(t T) {
+	t.Helper()
+
+	reader := sdkmetric.NewManualReader()
+	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+
+	otel.SetMeterProvider(meterProvider)
+
+	rm := &metricdata.ResourceMetrics{}
+
+	t.Cleanup(func() {
+		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Second)
+		defer cancel()
 
 		err := reader.Collect(ctx, rm)
 		if err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
 
 		if len(rm.ScopeMetrics) > 0 {
-			fmt.Println("\nOTEL METRICS")
+			t.Logf("=== METRICS")
 		}
 
-		printScopeMetrics(rm)
-
-		if err := tracerProvider.Shutdown(ctx); err != nil {
-			panic(err)
-		}
+		printScopeMetrics(t, rm)
 
 		if err := meterProvider.Shutdown(ctx); err != nil {
-			panic(err)
+			t.Fatal(err)
 		}
-	}()
-
-	return x.m.Run()
+	})
 }
 
-func printScopeMetrics(rm *metricdata.ResourceMetrics) {
+func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
 	const (
 		nameWidth = 40
 		sep       = "─"
@@ -127,8 +136,8 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 	}
 
 	printHeader := func(name, kind string, attrs attribute.Set) {
-		fmt.Printf("\n%-*s [%s]%s\n", nameWidth, name, kind, formatAttrs(attrs))
-		fmt.Printf("%s\n", strings.Repeat(sep, nameWidth+20))
+		t.Logf("%-*s [%s]%s\n", nameWidth, name, kind, formatAttrs(attrs))
+		t.Logf("%s\n", strings.Repeat(sep, nameWidth+40))
 	}
 
 	for _, scope := range rm.ScopeMetrics {
@@ -137,12 +146,12 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 			case metricdata.Sum[int64]:
 				for _, dp := range agg.DataPoints {
 					printHeader(m.Name, "counter", dp.Attributes)
-					fmt.Printf("  %-12s %d\n", "value:", dp.Value)
+					t.Logf("  %-12s %d\n", "value:", dp.Value)
 				}
 			case metricdata.Sum[float64]:
 				for _, dp := range agg.DataPoints {
 					printHeader(m.Name, "counter", dp.Attributes)
-					fmt.Printf("  %-12s %.3f\n", "value:", dp.Value)
+					t.Logf("  %-12s %.3f\n", "value:", dp.Value)
 				}
 			case metricdata.Histogram[float64]:
 				for _, dp := range agg.DataPoints {
@@ -156,41 +165,43 @@ func printScopeMetrics(rm *metricdata.ResourceMetrics) {
 						avg = (minV + maxV) / 2
 					}
 
-					fmt.Printf("Summary: Min %.3f, Max %.3f, Avg %.3f, Sum %.3f, Count %d\n\n",
+					t.Logf("Summary: Min %.3f, Max %.3f, Avg %.3f, Sum %.3f, Count %d\n\n",
 						minV, maxV, avg, dp.Sum, dp.Count)
 
 					// Buckets table - no unit assumption
 					if len(dp.Bounds) > 0 {
-						fmt.Println("Buckets:")
-						fmt.Println("┌────────────┬──────────┬─────────┐")
-						fmt.Println("│ Range      │ Count    │ %       │")
-						fmt.Println("├────────────┼──────────┼─────────┤")
+						t.Logf("Buckets:")
+						t.Logf("┌────────────┬──────────┬─────────┐")
+						t.Logf("│ Range      │ Count    │ %%      │")
+						t.Logf("├────────────┼──────────┼─────────┤")
 
 						total := dp.Count
 						for i, b := range dp.Bounds {
 							pct := float64(dp.BucketCounts[i]) / float64(total) * 100
-							fmt.Printf("│ %-10.1f │ %-8d │ %6.1f%% │\n", b, dp.BucketCounts[i], pct)
+							t.Logf("│ %-10.1f │ %-8d │ %6.1f%% │\n", b, dp.BucketCounts[i], pct)
 						}
-						fmt.Println("└────────────┴──────────┴─────────┘")
+						t.Logf("└────────────┴──────────┴─────────┘")
 					}
-					fmt.Println()
+					t.Logf("")
 				}
 			case metricdata.Gauge[int64]:
 				for _, dp := range agg.DataPoints {
 					printHeader(m.Name, "gauge", dp.Attributes)
-					fmt.Printf("  %-12s %d\n", "value:", dp.Value)
+					t.Logf("  %-12s %d\n", "value:", dp.Value)
 				}
 			case metricdata.Gauge[float64]:
 				for _, dp := range agg.DataPoints {
 					printHeader(m.Name, "gauge", dp.Attributes)
-					fmt.Printf("  %-12s %.3f\n", "value:", dp.Value)
+					t.Logf("  %-12s %.3f\n", "value:", dp.Value)
 				}
 			}
 		}
 	}
 }
 
-func printScopeTraces(spans tracetest.SpanStubs) {
+func printScopeTraces(t *testing.T, spans tracetest.SpanStubs) {
+	t.Helper()
+
 	const (
 		nameWidth = 40
 		sep       = "─"
@@ -199,18 +210,18 @@ func printScopeTraces(spans tracetest.SpanStubs) {
 	for _, s := range spans {
 		duration := s.EndTime.Sub(s.StartTime)
 
-		fmt.Printf("\n%-*s [%s] %s\n", nameWidth, s.Name, s.Status.Code, duration)
-		fmt.Printf("%s\n", strings.Repeat(sep, nameWidth+20))
+		t.Logf("%-*s [%s] %s\n", nameWidth, s.Name, s.Status.Code, duration)
+		t.Logf("%s\n", strings.Repeat(sep, nameWidth+40))
 
 		printedSomething := false
 
 		if s.SpanKind.String() != "" {
-			fmt.Printf("├─ Span Kind: %s\n", s.SpanKind)
+			t.Logf("├─ Span Kind: %s\n", s.SpanKind)
 			printedSomething = true
 		}
 
 		if len(s.Attributes) > 0 {
-			fmt.Printf("└─ Attributes:\n")
+			t.Logf("└─ Attributes:\n")
 			for i, a := range s.Attributes {
 				prefix := "   "
 				if i == 0 {
@@ -220,14 +231,14 @@ func printScopeTraces(spans tracetest.SpanStubs) {
 				} else {
 					prefix = "   ├─ "
 				}
-				fmt.Printf("%s%s: %s\n", prefix, string(a.Key), a.Value.Emit())
+				t.Logf("%s%s: %s\n", prefix, string(a.Key), a.Value.Emit())
 			}
 			printedSomething = true
 		}
 
 		if len(s.Events) > 0 && printedSomething {
-			fmt.Println("   ")
-			fmt.Printf("   └─ Events:\n")
+			t.Logf("   ")
+			t.Logf("   └─ Events:\n")
 			for i, e := range s.Events {
 				prefix := "      "
 				if i == 0 {
@@ -237,75 +248,75 @@ func printScopeTraces(spans tracetest.SpanStubs) {
 				} else {
 					prefix = "      ├─ "
 				}
-				fmt.Printf("%s%s", prefix, e.Name)
+				t.Logf("%s%s", prefix, e.Name)
 
 				if len(e.Attributes) > 0 {
 					parts := make([]string, 0, len(e.Attributes))
 					for _, a := range e.Attributes {
 						parts = append(parts, fmt.Sprintf("%s=%s", string(a.Key), a.Value.Emit()))
 					}
-					fmt.Printf(" {%s}", strings.Join(parts, ", "))
+					t.Logf(" {%s}", strings.Join(parts, ", "))
 				}
-				fmt.Println()
+				t.Log()
 			}
 		}
 
 		if printedSomething || len(s.Events) > 0 {
-			fmt.Println()
+			t.Log()
 		}
 	}
 }
 
-func setupOtelBenchmark(b *testing.B) {
-	b.Helper()
-
-	reader := sdkmetric.NewManualReader()
-	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-
-	otel.SetMeterProvider(provider)
-
-	rm := &metricdata.ResourceMetrics{}
-
-	b.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(b.Context()), time.Second)
-		defer cancel()
-
-		err := reader.Collect(ctx, rm)
-		if err != nil {
-			b.Fatal(err)
-		}
-
-		if len(rm.ScopeMetrics) > 0 {
-			fmt.Println("\nOTEL METRICS:")
-		}
-		// Iterate ResourceMetrics → ScopeMetrics → Metrics → DataPoints
-		for _, scope := range rm.ScopeMetrics {
-			for _, m := range scope.Metrics {
-				switch agg := m.Data.(type) {
-				case metricdata.Sum[int64]:
-					// Sum.DataPoints is []DataPoint[int64]
-					for _, dp := range agg.DataPoints {
-						b.ReportMetric(float64(dp.Value), m.Name+"/sum")
-					}
-				case metricdata.Histogram[int64]:
-					// Histogram.DataPoints is []HistogramDataPoint[int64]
-					for _, dp := range agg.DataPoints {
-						b.ReportMetric(float64(dp.Count), m.Name+"/count")
-						b.ReportMetric(float64(dp.Sum), m.Name+"/sum")
-					}
-				case metricdata.Gauge[int64]:
-					for _, dp := range agg.DataPoints {
-						b.ReportMetric(float64(dp.Value), m.Name+"/gauge")
-					}
-				}
-			}
-		}
-
-		if err := provider.Shutdown(ctx); err != nil {
-			b.Fatal(err)
-		}
-	})
-}
+// func setupOtelBenchmark(b *testing.B) {
+// 	b.Helper()
+//
+// 	reader := sdkmetric.NewManualReader()
+// 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
+//
+// 	otel.SetMeterProvider(provider)
+//
+// 	rm := &metricdata.ResourceMetrics{}
+//
+// 	b.Cleanup(func() {
+// 		ctx, cancel := context.WithTimeout(context.WithoutCancel(b.Context()), time.Second)
+// 		defer cancel()
+//
+// 		err := reader.Collect(ctx, rm)
+// 		if err != nil {
+// 			b.Fatal(err)
+// 		}
+//
+// 		if len(rm.ScopeMetrics) > 0 {
+// 			t.Logf("\nOTEL METRICS:")
+// 		}
+// 		// Iterate ResourceMetrics → ScopeMetrics → Metrics → DataPoints
+// 		for _, scope := range rm.ScopeMetrics {
+// 			for _, m := range scope.Metrics {
+// 				switch agg := m.Data.(type) {
+// 				case metricdata.Sum[int64]:
+// 					// Sum.DataPoints is []DataPoint[int64]
+// 					for _, dp := range agg.DataPoints {
+// 						b.ReportMetric(float64(dp.Value), m.Name+"/sum")
+// 					}
+// 				case metricdata.Histogram[int64]:
+// 					// Histogram.DataPoints is []HistogramDataPoint[int64]
+// 					for _, dp := range agg.DataPoints {
+// 						b.ReportMetric(float64(dp.Count), m.Name+"/count")
+// 						b.ReportMetric(float64(dp.Sum), m.Name+"/sum")
+// 					}
+// 				case metricdata.Gauge[int64]:
+// 					for _, dp := range agg.DataPoints {
+// 						b.ReportMetric(float64(dp.Value), m.Name+"/gauge")
+// 					}
+// 				}
+// 			}
+// 		}
+//
+// 		if err := provider.Shutdown(ctx); err != nil {
+// 			b.Fatal(err)
+// 		}
+// 	})
+// }
 
 func BenchmarkGo_withName(b *testing.B) {
 	b.ReportAllocs()
@@ -332,37 +343,38 @@ func BenchmarkGo_withTracing(b *testing.B) {
 }
 
 func BenchmarkGo_withCounterMetric(b *testing.B) {
+	ReportMetrics(b)
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Go(ctx, gofunc,
 			gofuncy.WithCounterMetric(),
+		)
+		<-errChan
+	}
+}
+
+func BenchmarkGo_withUpDownMetric(b *testing.B) {
+	ReportMetrics(b)
+	b.ReportAllocs()
+	ctx := gofuncy.Ctx(b.Context()).Root()
+
+	for b.Loop() {
+		errChan := gofuncy.Go(ctx, gofunc,
+			gofuncy.WithUpDownMetric(),
 		)
 		<-errChan
 	}
 }
 
 func BenchmarkGo_withDurationMetric(b *testing.B) {
+	ReportMetrics(b)
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Go(ctx, gofunc,
-			gofuncy.WithDurationMetric(),
-		)
-		<-errChan
-	}
-}
-
-func BenchmarkGo_withTelemetry(b *testing.B) {
-	b.ReportAllocs()
-	ctx := gofuncy.Ctx(b.Context()).Root()
-
-	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
-			gofuncy.WithTracing(),
-			gofuncy.WithCounterMetric(),
 			gofuncy.WithDurationMetric(),
 		)
 		<-errChan

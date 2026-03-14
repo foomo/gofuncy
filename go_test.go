@@ -6,6 +6,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/foomo/gofuncy"
 	"github.com/stretchr/testify/assert"
@@ -14,7 +15,7 @@ import (
 )
 
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(Run(m))
+	goleak.VerifyTestMain(m)
 }
 
 func TestGo_withName(t *testing.T) {
@@ -24,7 +25,6 @@ func TestGo_withName(t *testing.T) {
 			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
 			return nil
 		},
-		gofuncy.WithTracing(),
 		gofuncy.WithName(expected),
 	)
 	assert.NoError(t, <-errChan)
@@ -70,12 +70,66 @@ func TestGo_withNilOption(t *testing.T) {
 	assert.True(t, called.Load())
 }
 
-func TestGo_withDurationMetric(t *testing.T) {
+func TestGo_withTracing(t *testing.T) {
+	ReportTraces(t)
+
 	var called atomic.Bool
 
 	errChan := gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			called.Store(true)
+			return nil
+		},
+		gofuncy.WithTracing(),
+	)
+
+	require.NoError(t, <-errChan)
+	assert.True(t, called.Load())
+}
+
+func TestGo_withCounterMetric(t *testing.T) {
+	ReportMetrics(t)
+
+	var called atomic.Bool
+
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			called.Store(true)
+			return nil
+		},
+		gofuncy.WithCounterMetric(),
+	)
+
+	require.NoError(t, <-errChan)
+	assert.True(t, called.Load())
+}
+
+func TestGo_withUpDownMetric(t *testing.T) {
+	ReportMetrics(t)
+
+	var called atomic.Bool
+
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			called.Store(true)
+			return nil
+		},
+		gofuncy.WithUpDownMetric(),
+	)
+
+	require.NoError(t, <-errChan)
+	assert.True(t, called.Load())
+}
+
+func TestGo_withDurationMetric(t *testing.T) {
+	ReportMetrics(t)
+
+	var called atomic.Bool
+
+	errChan := gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			called.Store(true)
+			time.Sleep(time.Second)
 			return nil
 		},
 		gofuncy.WithDurationMetric(),

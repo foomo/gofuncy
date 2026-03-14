@@ -26,9 +26,10 @@ type (
 		l    *slog.Logger
 		name string
 		// telemetry
-		tracingEnabled        bool
-		counterMetricEnabled  bool
-		durationMetricEnabled bool
+		tracing        bool
+		upDownMetric   bool
+		counterMetric  bool
+		durationMetric bool
 	}
 	Option func(*options)
 )
@@ -47,19 +48,25 @@ func WithLogger(l *slog.Logger) Option {
 
 func WithTracing() Option {
 	return func(o *options) {
-		o.tracingEnabled = true
+		o.tracing = true
 	}
 }
 
-func WithCounterMetric() Option {
+func WithUpDownMetric() Option {
 	return func(o *options) {
-		o.counterMetricEnabled = true
+		o.upDownMetric = true
 	}
 }
 
 func WithDurationMetric() Option {
 	return func(o *options) {
-		o.durationMetricEnabled = true
+		o.durationMetric = true
+	}
+}
+
+func WithCounterMetric() Option {
+	return func(o *options) {
+		o.counterMetric = true
 	}
 }
 
@@ -67,12 +74,14 @@ func WithDurationMetric() Option {
 func (o *options) reset() {
 	o.l = nil
 	o.name = NameNoName
-	o.tracingEnabled = false
-	o.counterMetricEnabled = false
-	o.durationMetricEnabled = false
+	o.tracing = false
+	o.upDownMetric = false
+	o.counterMetric = false
+	o.durationMetric = false
 }
 
-func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
+func Go(c
+tx context.Context, fn Func, opts ...Option) <-chan error {
 	// get options from pool, reset to defaults
 	var o *options
 	if opt, ok := optionsPool.Get().(*options); ok {
@@ -100,7 +109,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 
 	traceAttrs := traceAttrsBuf[:0]
 
-	if o.tracingEnabled {
+	if o.tracing {
 		// add caller
 		if pc, file, line, ok := runtime.Caller(1); ok {
 			traceAttrs = append(traceAttrs,
@@ -142,7 +151,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 
 		var span trace.Span
 
-		if o.tracingEnabled {
+		if o.tracing {
 			var sb strings.Builder
 			sb.WriteString("gofuncy.go ")
 			sb.WriteString(o.name)
@@ -190,28 +199,33 @@ func Go(ctx context.Context, fn Func, opts ...Option) <-chan error {
 		}()
 
 		// create metrics if enabled (guard to avoid alloc when metrics are nil)
-		if o.counterMetricEnabled || o.durationMetricEnabled {
+		if o.upDownMetric || o.counterMetric || o.durationMetric {
 			metricAttrs := metric.WithAttributes(semconv.RoutineName(o.name))
 
-			if o.counterMetricEnabled {
-				counter := goroutinesCounter()
-				counter.Add(ctx, 1, metricAttrs)
+			if o.upDownMetric {
+				upDownCounter := goroutinesUpDownCounter()
+				upDownCounter.Add(ctx, 1, metricAttrs)
 
 				defer func() {
-					counter.Add(ctx, -1, metricAttrs)
+					upDownCounter.Add(ctx, -1, metricAttrs)
 				}()
 			}
 
-			if o.durationMetricEnabled {
+			if o.counterMetric {
+				counter := goroutinesCounter()
+				counter.Add(ctx, 1, metricAttrs)
+			}
+
+			if o.durationMetric {
 				// pre-compute error attribute options to avoid alloc in defer
 				metricAttrsOk := metric.WithAttributes(semconv.RoutineName(o.name), attribute.Bool("error", false))
 				metricAttrsErr := metric.WithAttributes(semconv.RoutineName(o.name), attribute.Bool("error", true))
 
 				defer func() {
 					if err != nil {
-						goroutinesDurationHistogram().Record(ctx, time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsErr)
+						goroutinesDurationHistogram().Record(context.WithoutCancel(ctx), time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsErr)
 					} else {
-						goroutinesDurationHistogram().Record(ctx, time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsOk)
+						goroutinesDurationHistogram().Record(context.WithoutCancel(ctx), time.Since(start).Truncate(time.Millisecond).Seconds(), metricAttrsOk)
 					}
 				}()
 			}

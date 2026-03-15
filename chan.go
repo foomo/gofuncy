@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/metric"
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -110,7 +109,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 
 	// create counter metric if enabled
 	if inst.counterMetricEnabled {
-		chansUpDownCounter().Add(context.Background(), 1, metric.WithAttributes(semconv.ChanName(inst.name)))
+		chansCurrentMetric().Add(context.Background(), 1, inst.name)
 	}
 
 	return inst
@@ -167,9 +166,7 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 		}
 
 		if g.counterMetricEnabled {
-			messagesCounter().Add(ctx, -1, metric.WithAttributes(
-				semconv.ChanName(g.name)),
-			)
+			messagesCurrentMetric().Add(ctx, -1, g.name)
 		}
 
 		if l != nil {
@@ -234,9 +231,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 	}
 
 	if g.counterMetricEnabled {
-		messagesCounter().Add(ctx, int64(len(values)), metric.WithAttributes(
-			semconv.ChanName(g.name)),
-		)
+		messagesCurrentMetric().Add(ctx, int64(len(values)), g.name)
 	}
 
 	for _, data := range values {
@@ -249,9 +244,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 			return ErrChanClosed
 		case g.channel <- g.newMessage(span, l, routineName, data):
 			if g.messagesDurationMetricEnabled {
-				messagesDurationHistogram().Record(ctx, time.Since(s).Truncate(time.Millisecond).Seconds(), metric.WithAttributes(
-					semconv.ChanName(g.name)),
-				)
+				messagesDurationMetric().Record(ctx, time.Since(s).Truncate(time.Millisecond).Seconds(), g.name)
 			}
 		}
 	}
@@ -311,9 +304,7 @@ func (g *Chan[T]) ReceiveValue(ctx context.Context) (T, bool) {
 		}
 
 		if g.counterMetricEnabled {
-			messagesCounter().Add(ctx, -1, metric.WithAttributes(
-				semconv.ChanName(g.name)),
-			)
+			messagesCurrentMetric().Add(ctx, -1, g.name)
 		}
 
 		if l != nil {
@@ -353,7 +344,7 @@ func (g *Chan[T]) Close() {
 	}
 
 	if g.counterMetricEnabled {
-		chansUpDownCounter().Add(context.Background(), -1, metric.WithAttributes(semconv.ChanName(g.name)))
+		chansCurrentMetric().Add(context.Background(), -1, g.name)
 	}
 
 	close(g.closing)

@@ -2,7 +2,6 @@ package gofuncy
 
 import (
 	"context"
-	"log/slog"
 	"runtime"
 	"strings"
 	"time"
@@ -13,14 +12,16 @@ import (
 	"go.opentelemetry.io/otel/trace"
 )
 
-// Go spawns a fire-and-forget goroutine with panic recovery.
-// Errors are logged via slog by default; use WithErrorHandler to override.
-func Go(ctx context.Context, fn Func, opts ...Option) {
+// Async spawns a single goroutine and returns its error channel.
+// The caller has explicit lifecycle control by reading from the returned channel.
+func Async(ctx context.Context, fn Func, opts ...Option) <-chan error {
 	o := getOptions(opts)
 
-	// capture error handler and logger before passing options to goroutine
-	errorHandler := o.errorHandler
+	// create logger (only if provided, avoid allocation)
 	l := o.l
+	if l != nil {
+		l = l.WithGroup("gofuncy.async").With("gofuncy_name", o.name)
+	}
 
 	// create telemetry if enabled — use stack-allocated array to avoid heap alloc
 	var traceAttrsBuf [4]attribute.KeyValue
@@ -37,36 +38,20 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 		}
 	}
 
-	go func(ctx context.Context, o *options) {
+	// only capture delay when logger is set
+	var delay time.Time
+	if l != nil {
+		delay = time.Now()
+	}
+
+	errChan := make(chan error, 1)
+	go func(ctx context.Context, o *options, errChan chan<- error) {
+		defer close(errChan)
 		defer optionsPool.Put(o)
 
 		var err error
 
-		defer func() {
-			if err == nil {
-				return
-			}
-
-			if errorHandler != nil {
-				errorHandler(ctx, err)
-
-				return
-			}
-
-			if l != nil {
-				l.WarnContext(ctx, "gofuncy.go error",
-					"name", o.name,
-					"err", err,
-				)
-
-				return
-			}
-
-			slog.Default().WarnContext(ctx, "gofuncy.go error",
-				"name", o.name,
-				"err", err,
-			)
-		}()
+		defer func() { errChan <- err }()
 
 		defer recoverError(&err)
 
@@ -79,6 +64,10 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 		routineName := NameFromContext(ctx)
 
 		if routineName != NameNoName {
+			if l != nil {
+				l = l.With("gofuncy_parent", routineName)
+			}
+
 			traceAttrs = append(traceAttrs, attribute.String("gofuncy.routine.parent", routineName))
 		}
 
@@ -86,13 +75,20 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 
 		if o.tracing {
 			var sb strings.Builder
-			sb.WriteString("gofuncy.go ")
+			sb.WriteString("gofuncy.async ")
 			sb.WriteString(o.name)
 
 			ctx, span = tracer.Start(ctx,
 				sb.String(),
 				trace.WithAttributes(traceAttrs...),
 			)
+
+			if span.IsRecording() && l != nil {
+				l = l.With(
+					"trace_id", span.SpanContext().TraceID().String(),
+					"span_id", span.SpanContext().SpanID().String(),
+				)
+			}
 
 			defer func() {
 				if err != nil {
@@ -103,6 +99,27 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 				span.End()
 			}()
 		}
+
+		if l != nil {
+			l.DebugContext(ctx, "go",
+				"delay", time.Since(delay).Round(time.Millisecond),
+			)
+		}
+
+		defer func() {
+			if l != nil {
+				if err != nil {
+					l.WarnContext(ctx, "stop",
+						"duration", time.Since(start).Round(time.Millisecond),
+						"err", err,
+					)
+				} else {
+					l.DebugContext(ctx, "stop",
+						"duration", time.Since(start).Round(time.Millisecond),
+					)
+				}
+			}
+		}()
 
 		// create metrics if enabled
 		if o.upDownMetric || o.counterMetric || o.durationMetric {
@@ -142,5 +159,13 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 		}
 
 		err = fn(ctx)
-	}(ctx, o)
+	}(ctx, o, errChan)
+
+	return errChan
+}
+
+// AsyncBackground is like Async but detaches from the parent context's cancellation.
+// The goroutine will continue running even if the parent context is canceled.
+func AsyncBackground(ctx context.Context, fn Func, opts ...Option) <-chan error {
+	return Async(context.WithoutCancel(ctx), fn, opts...)
 }

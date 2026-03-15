@@ -1,20 +1,93 @@
 package gofuncy
 
 import (
+	"context"
+	"errors"
 	"sync"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
+	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+
+	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
 
 var (
-	meter  = otel.Meter("github.com/foomo/gofuncy")
+	meter  = otel.Meter("github.com/foomo/gofuncy", metric.WithSchemaURL(otelsemconv.SchemaURL))
 	tracer = otel.Tracer("github.com/foomo/gofuncy")
 )
 
-var goroutinesCounter = sync.OnceValue(func() metric.Int64Counter {
-	c, err := meter.Int64Counter("gofuncy.goroutines.total",
-		metric.WithDescription("Gofuncy running go routine count"))
+// instrumentation encapsulates all OTel metrics for goroutine operations.
+type instrumentation struct {
+	goroutinesTotal    gofuncyconv.GoroutinesTotal
+	goroutinesCurrent  gofuncyconv.GoroutinesCurrent
+	goroutinesDuration gofuncyconv.GoroutinesDuration
+	groupsDuration     gofuncyconv.GroupsDuration
+}
+
+var initInstrumentation = sync.OnceValues(func() (*instrumentation, error) {
+	inst := &instrumentation{}
+
+	var err, e error
+
+	inst.goroutinesTotal, e = gofuncyconv.NewGoroutinesTotal(meter)
+	err = errors.Join(err, e)
+
+	inst.goroutinesCurrent, e = gofuncyconv.NewGoroutinesCurrent(meter)
+	err = errors.Join(err, e)
+
+	inst.goroutinesDuration, e = gofuncyconv.NewGoroutinesDuration(meter)
+	err = errors.Join(err, e)
+
+	inst.groupsDuration, e = gofuncyconv.NewGroupsDuration(meter)
+	err = errors.Join(err, e)
+
+	return inst, err
+})
+
+func (i *instrumentation) addGoroutine(ctx context.Context, routineName string) {
+	if i == nil {
+		return
+	}
+
+	i.goroutinesTotal.Add(ctx, 1, routineName)
+}
+
+func (i *instrumentation) incGoroutine(ctx context.Context, routineName string) {
+	if i == nil {
+		return
+	}
+
+	i.goroutinesCurrent.Add(ctx, 1, routineName)
+}
+
+func (i *instrumentation) decGoroutine(ctx context.Context, routineName string) {
+	if i == nil {
+		return
+	}
+
+	i.goroutinesCurrent.Add(ctx, -1, routineName)
+}
+
+func (i *instrumentation) recordGoroutineDuration(ctx context.Context, seconds float64, routineName string, hasError bool) {
+	if i == nil {
+		return
+	}
+
+	i.goroutinesDuration.Record(ctx, seconds, routineName, hasError)
+}
+
+func (i *instrumentation) recordGroupDuration(ctx context.Context, seconds float64, routineName string, hasError bool, groupSize int) {
+	if i == nil {
+		return
+	}
+
+	i.groupsDuration.Record(ctx, seconds, routineName, hasError, groupSize)
+}
+
+// chan metrics — kept as sync.OnceValue for backward compatibility with chan.go
+var chansCurrentMetric = sync.OnceValue(func() gofuncyconv.ChansCurrent {
+	c, err := gofuncyconv.NewChansCurrent(meter)
 	if err != nil {
 		otel.Handle(err)
 	}
@@ -22,9 +95,8 @@ var goroutinesCounter = sync.OnceValue(func() metric.Int64Counter {
 	return c
 })
 
-var goroutinesUpDownCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
-	c, err := meter.Int64UpDownCounter("gofuncy.goroutines.current",
-		metric.WithDescription("Gofuncy running go routine up/down count"))
+var messagesCurrentMetric = sync.OnceValue(func() gofuncyconv.MessagesCurrent {
+	c, err := gofuncyconv.NewMessagesCurrent(meter)
 	if err != nil {
 		otel.Handle(err)
 	}
@@ -32,42 +104,8 @@ var goroutinesUpDownCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
 	return c
 })
 
-var goroutinesDurationHistogram = sync.OnceValue(func() metric.Float64Histogram {
-	h, err := meter.Float64Histogram("gofuncy.goroutines.duration.seconds",
-		metric.WithDescription("Gofuncy go routine duration histogram"),
-		metric.WithUnit("s"),
-		metric.WithExplicitBucketBoundaries(0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0))
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	return h
-})
-
-var chansUpDownCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
-	c, err := meter.Int64UpDownCounter("gofuncy.chans.current",
-		metric.WithDescription("Gofuncy open chan up/down count"))
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	return c
-})
-
-var messagesCounter = sync.OnceValue(func() metric.Int64UpDownCounter {
-	c, err := meter.Int64UpDownCounter("gofuncy.messages.current",
-		metric.WithDescription("Gofuncy pending message count"))
-	if err != nil {
-		otel.Handle(err)
-	}
-
-	return c
-})
-
-var messagesDurationHistogram = sync.OnceValue(func() metric.Float64Histogram {
-	h, err := meter.Float64Histogram("gofuncy.messages.duration.seconds",
-		metric.WithDescription("Gofuncy chan message send duration"),
-		metric.WithUnit("s"))
+var messagesDurationMetric = sync.OnceValue(func() gofuncyconv.MessagesDuration {
+	h, err := gofuncyconv.NewMessagesDuration(meter)
 	if err != nil {
 		otel.Handle(err)
 	}

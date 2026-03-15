@@ -46,8 +46,10 @@ tmp/
 !.golangci.yaml
 !.goreleaser.yaml
 
+## Node
+**/node_modules/
+
 ## Vitepress
-node_modules/
 !docs/.vitepress
 docs/.vitepress/*
 !docs/.vitepress/theme/

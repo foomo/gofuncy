@@ -3,8 +3,6 @@ package gofuncy_test
 import (
 	"context"
 	"fmt"
-	"sync"
-	"sync/atomic"
 	"testing"
 	"time"
 
@@ -18,193 +16,195 @@ func TestMain(m *testing.M) {
 	goleak.VerifyTestMain(m)
 }
 
-func TestGo_withName(t *testing.T) {
-	expected := "gofuncy_test"
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
-			return nil
-		},
-		gofuncy.WithName(expected),
-	)
-	assert.NoError(t, <-errChan)
+func ExampleGo() {
+	done := make(chan struct{})
+
+	gofuncy.Go(context.Background(), func(ctx context.Context) error {
+		defer close(done)
+
+		fmt.Println("running")
+
+		return nil
+	})
+
+	<-done
+	// Output:
+	// running
 }
 
-func TestGo_withContextCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	cancel()
+func TestGo_basic(t *testing.T) {
+	t.Parallel()
 
-	errChan := gofuncy.Go(ctx,
+	done := make(chan struct{})
+
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
+			close(done)
 			return nil
 		},
 	)
 
-	require.ErrorIs(t, <-errChan, context.Canceled)
-}
-
-func TestGo_withContextCanceled(t *testing.T) {
-	ctx, cancel := context.WithCancel(t.Context())
-	errChan := gofuncy.Go(ctx,
-		func(ctx context.Context) error {
-			cancel()
-			return ctx.Err()
-		},
-	)
-
-	require.ErrorIs(t, <-errChan, context.Canceled)
-}
-
-func TestGo_withNilOption(t *testing.T) {
-	var called atomic.Bool
-
-	errChan := gofuncy.Go(t.Context(),
-		func(ctx context.Context) error {
-			called.Store(true)
-			return nil
-		},
-		nil, // passing nil option should not panic
-	)
-
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
 }
 
 func TestGo_withTracing(t *testing.T) {
+	t.Parallel()
 	ReportTraces(t)
 
-	var called atomic.Bool
+	done := make(chan struct{})
 
-	errChan := gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			called.Store(true)
+			close(done)
 			return nil
 		},
 		gofuncy.WithTracing(),
 	)
 
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
 }
 
 func TestGo_withCounterMetric(t *testing.T) {
+	t.Parallel()
+
 	ReportMetrics(t)
 
-	var called atomic.Bool
+	done := make(chan struct{})
 
-	errChan := gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			called.Store(true)
+			close(done)
 			return nil
 		},
 		gofuncy.WithCounterMetric(),
 	)
 
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
 }
 
 func TestGo_withUpDownMetric(t *testing.T) {
+	t.Parallel()
+
 	ReportMetrics(t)
 
-	var called atomic.Bool
+	done := make(chan struct{})
 
-	errChan := gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			called.Store(true)
+			close(done)
 			return nil
 		},
 		gofuncy.WithUpDownMetric(),
 	)
 
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
 }
 
 func TestGo_withDurationMetric(t *testing.T) {
+	t.Parallel()
+
 	ReportMetrics(t)
 
-	var called atomic.Bool
+	done := make(chan struct{})
 
-	errChan := gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			called.Store(true)
-			time.Sleep(time.Second)
+			close(done)
 			return nil
 		},
 		gofuncy.WithDurationMetric(),
 	)
 
-	require.NoError(t, <-errChan)
-	assert.True(t, called.Load())
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
 }
 
-func TestGo_contextNamePropagation(t *testing.T) {
-	parentName := "parent-routine"
+func TestGo_errorHandler(t *testing.T) {
+	t.Parallel()
 
-	var childName string
+	errCh := make(chan error, 1)
 
-	var mu sync.Mutex
-
-	errChan := gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			// Inside the routine, spawn a child routine
-			childErrChan := gofuncy.Go(ctx,
-				func(childCtx context.Context) error {
-					mu.Lock()
-					childName = gofuncy.NameFromContext(childCtx)
-					mu.Unlock()
-
-					return nil
-				},
-				gofuncy.WithName("child-routine"),
-			)
-
-			return <-childErrChan
+			return fmt.Errorf("test error")
 		},
-		gofuncy.WithName(parentName),
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+			errCh <- err
+		}),
 	)
 
-	err := <-errChan
-	require.NoError(t, err)
-
-	mu.Lock()
-	assert.Equal(t, "child-routine", childName)
-	mu.Unlock()
+	select {
+	case err := <-errCh:
+		require.EqualError(t, err, "test error")
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for error handler")
+	}
 }
 
-func TestGo_concurrent(t *testing.T) {
-	const numGoroutines = 100
+func TestGo_panicRecovery(t *testing.T) {
+	t.Parallel()
 
-	var wg sync.WaitGroup
+	errCh := make(chan error, 1)
 
-	var successCount atomic.Int32
+	gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			panic("fire and forget panic")
+		},
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+			errCh <- err
+		}),
+	)
 
-	var errCount atomic.Int32
-
-	wg.Add(numGoroutines)
-
-	for i := range numGoroutines {
-		go func(idx int) {
-			defer wg.Done()
-
-			errChan := gofuncy.Go(t.Context(),
-				func(ctx context.Context) error {
-					return nil
-				},
-				gofuncy.WithName(fmt.Sprintf("goroutine-%d", idx)),
-			)
-
-			if err := <-errChan; err != nil {
-				errCount.Add(1)
-			} else {
-				successCount.Add(1)
-			}
-		}(i)
+	select {
+	case err := <-errCh:
+		var panicErr *gofuncy.PanicError
+		require.ErrorAs(t, err, &panicErr)
+		assert.Equal(t, "fire and forget panic", panicErr.Value)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for panic error")
 	}
+}
 
-	wg.Wait()
+func TestGo_contextCanceled(t *testing.T) {
+	t.Parallel()
 
-	assert.Equal(t, int32(numGoroutines), successCount.Load())
-	assert.Equal(t, int32(0), errCount.Load())
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+
+	errCh := make(chan error, 1)
+
+	gofuncy.Go(ctx,
+		func(ctx context.Context) error {
+			return nil
+		},
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+			errCh <- err
+		}),
+	)
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for context error")
+	}
 }

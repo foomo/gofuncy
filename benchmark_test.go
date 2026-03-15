@@ -37,13 +37,13 @@ func BenchmarkGoRaw(b *testing.B) {
 	}
 }
 
-func BenchmarkGo(b *testing.B) {
+func BenchmarkAsync(b *testing.B) {
 	b.ReportAllocs()
 
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc)
+		errChan := gofuncy.Async(ctx, gofunc)
 		<-errChan
 	}
 }
@@ -129,9 +129,11 @@ func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
 		for _, v := range a.ToSlice() {
 			parts = append(parts, fmt.Sprintf("%s=%s", string(v.Key), v.Value.Emit()))
 		}
+
 		if len(parts) == 0 {
 			return ""
 		}
+
 		return " {" + strings.Join(parts, ", ") + "}"
 	}
 
@@ -160,6 +162,7 @@ func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
 					// One-line summary - no unit assumption
 					minV, minOk := dp.Min.Value()
 					maxV, maxOk := dp.Max.Value()
+
 					avg := 0.0
 					if minOk && maxOk {
 						avg = (minV + maxV) / 2
@@ -172,7 +175,7 @@ func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
 					if len(dp.Bounds) > 0 {
 						t.Logf("Buckets:")
 						t.Logf("┌────────────┬──────────┬─────────┐")
-						t.Logf("│ Range      │ Count    │ %%      │")
+						t.Logf("│ Range      │ Count    │ %%       │")
 						t.Logf("├────────────┼──────────┼─────────┤")
 
 						total := dp.Count
@@ -180,8 +183,10 @@ func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
 							pct := float64(dp.BucketCounts[i]) / float64(total) * 100
 							t.Logf("│ %-10.1f │ %-8d │ %6.1f%% │\n", b, dp.BucketCounts[i], pct)
 						}
+
 						t.Logf("└────────────┴──────────┴─────────┘")
 					}
+
 					t.Logf("")
 				}
 			case metricdata.Gauge[int64]:
@@ -217,37 +222,43 @@ func printScopeTraces(t *testing.T, spans tracetest.SpanStubs) {
 
 		if s.SpanKind.String() != "" {
 			t.Logf("├─ Span Kind: %s\n", s.SpanKind)
+
 			printedSomething = true
 		}
 
 		if len(s.Attributes) > 0 {
 			t.Logf("└─ Attributes:\n")
+
 			for i, a := range s.Attributes {
-				prefix := "   "
-				if i == 0 {
+				var prefix string
+
+				switch {
+				case i == 0, i < len(s.Attributes)-1:
 					prefix = "   ├─ "
-				} else if i == len(s.Attributes)-1 {
+				default:
 					prefix = "   └─ "
-				} else {
-					prefix = "   ├─ "
 				}
+
 				t.Logf("%s%s: %s\n", prefix, string(a.Key), a.Value.Emit())
 			}
+
 			printedSomething = true
 		}
 
 		if len(s.Events) > 0 && printedSomething {
 			t.Logf("   ")
 			t.Logf("   └─ Events:\n")
+
 			for i, e := range s.Events {
-				prefix := "      "
-				if i == 0 {
+				var prefix string
+
+				switch {
+				case i == 0, i < len(s.Events)-1:
 					prefix = "      ├─ "
-				} else if i == len(s.Events)-1 {
+				default:
 					prefix = "      └─ "
-				} else {
-					prefix = "      ├─ "
 				}
+
 				t.Logf("%s%s", prefix, e.Name)
 
 				if len(e.Attributes) > 0 {
@@ -255,8 +266,10 @@ func printScopeTraces(t *testing.T, spans tracetest.SpanStubs) {
 					for _, a := range e.Attributes {
 						parts = append(parts, fmt.Sprintf("%s=%s", string(a.Key), a.Value.Emit()))
 					}
+
 					t.Logf(" {%s}", strings.Join(parts, ", "))
 				}
+
 				t.Log()
 			}
 		}
@@ -267,114 +280,63 @@ func printScopeTraces(t *testing.T, spans tracetest.SpanStubs) {
 	}
 }
 
-// func setupOtelBenchmark(b *testing.B) {
-// 	b.Helper()
-//
-// 	reader := sdkmetric.NewManualReader()
-// 	provider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-//
-// 	otel.SetMeterProvider(provider)
-//
-// 	rm := &metricdata.ResourceMetrics{}
-//
-// 	b.Cleanup(func() {
-// 		ctx, cancel := context.WithTimeout(context.WithoutCancel(b.Context()), time.Second)
-// 		defer cancel()
-//
-// 		err := reader.Collect(ctx, rm)
-// 		if err != nil {
-// 			b.Fatal(err)
-// 		}
-//
-// 		if len(rm.ScopeMetrics) > 0 {
-// 			t.Logf("\nOTEL METRICS:")
-// 		}
-// 		// Iterate ResourceMetrics → ScopeMetrics → Metrics → DataPoints
-// 		for _, scope := range rm.ScopeMetrics {
-// 			for _, m := range scope.Metrics {
-// 				switch agg := m.Data.(type) {
-// 				case metricdata.Sum[int64]:
-// 					// Sum.DataPoints is []DataPoint[int64]
-// 					for _, dp := range agg.DataPoints {
-// 						b.ReportMetric(float64(dp.Value), m.Name+"/sum")
-// 					}
-// 				case metricdata.Histogram[int64]:
-// 					// Histogram.DataPoints is []HistogramDataPoint[int64]
-// 					for _, dp := range agg.DataPoints {
-// 						b.ReportMetric(float64(dp.Count), m.Name+"/count")
-// 						b.ReportMetric(float64(dp.Sum), m.Name+"/sum")
-// 					}
-// 				case metricdata.Gauge[int64]:
-// 					for _, dp := range agg.DataPoints {
-// 						b.ReportMetric(float64(dp.Value), m.Name+"/gauge")
-// 					}
-// 				}
-// 			}
-// 		}
-//
-// 		if err := provider.Shutdown(ctx); err != nil {
-// 			b.Fatal(err)
-// 		}
-// 	})
-// }
-
-func BenchmarkGo_withName(b *testing.B) {
+func BenchmarkAsync_withName(b *testing.B) {
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
+		errChan := gofuncy.Async(ctx, gofunc,
 			gofuncy.WithName("benchmark-routine"),
 		)
 		<-errChan
 	}
 }
 
-func BenchmarkGo_withTracing(b *testing.B) {
+func BenchmarkAsync_withTracing(b *testing.B) {
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
+		errChan := gofuncy.Async(ctx, gofunc,
 			gofuncy.WithTracing(),
 		)
 		<-errChan
 	}
 }
 
-func BenchmarkGo_withCounterMetric(b *testing.B) {
+func BenchmarkAsync_withCounterMetric(b *testing.B) {
 	ReportMetrics(b)
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
+		errChan := gofuncy.Async(ctx, gofunc,
 			gofuncy.WithCounterMetric(),
 		)
 		<-errChan
 	}
 }
 
-func BenchmarkGo_withUpDownMetric(b *testing.B) {
+func BenchmarkAsync_withUpDownMetric(b *testing.B) {
 	ReportMetrics(b)
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
+		errChan := gofuncy.Async(ctx, gofunc,
 			gofuncy.WithUpDownMetric(),
 		)
 		<-errChan
 	}
 }
 
-func BenchmarkGo_withDurationMetric(b *testing.B) {
+func BenchmarkAsync_withDurationMetric(b *testing.B) {
 	ReportMetrics(b)
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
-		errChan := gofuncy.Go(ctx, gofunc,
+		errChan := gofuncy.Async(ctx, gofunc,
 			gofuncy.WithDurationMetric(),
 		)
 		<-errChan

@@ -1,0 +1,13 @@
+{
+	"name": "gofuncy",
+	"devDependencies": {
+		"micromark-util-decode-string": "2.0.1",
+		"vitepress": "1.6.4"
+	},
+	"private": true,
+	"scripts": {
+		"dev": "vitepress dev",
+		"build": "vitepress build",
+		"preview": "vitepress preview"
+	}
+}

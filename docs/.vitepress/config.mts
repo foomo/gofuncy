@@ -9,10 +9,17 @@ export default defineConfig({
 		outline: [2, 4],
 		sidebar: [
 			{
-				text: 'Welcome',
+				text: 'Overview',
 				items: [
-					{ text: 'Overview', link: '/' },
-					{ text: 'Usage', link: '/usage' },
+					{ text: 'Introduction', link: '/' },
+					{ text: 'Telemetry', link: '/telemetry' },
+				],
+			},
+			{
+				text: 'API',
+				items: [
+					{ text: 'Go', link: '/go' },
+					{ text: 'GoBackground', link: '/gobackground' },
 				],
 			},
 			{

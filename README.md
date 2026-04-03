@@ -160,9 +160,6 @@ flowchart TB
 
 ## How to Contribute
 
-
-## How to Contribute
-
 Contributions are welcome! Please read the [contributing guide](docs/CONTRIBUTING.md).
 
 ![Contributors](https://contributors-table.vercel.app/image?repo=foomo/gofuncy&width=50&columns=15)

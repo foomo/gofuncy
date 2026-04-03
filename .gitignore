@@ -34,9 +34,6 @@ tmp/
 ## Docker
 !.dockerignore
 
-## Node ##
-**/node_modules/
-
 ## TypeScript
 *.tsbuildinfo
 
@@ -47,6 +44,7 @@ tmp/
 !.goreleaser.yaml
 
 ## Node
+!.npmrc
 **/node_modules/
 
 ## Vitepress

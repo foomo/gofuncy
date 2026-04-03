@@ -15,10 +15,10 @@ func main() {
 
 	ctx := gofuncy.Ctx(context.Background()).Root()
 
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTracing())
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"))
+	gofuncy.Go(ctx, send(msg), gofuncy.GoOption().WithName("sender-a").WithTracing())
+	gofuncy.Go(ctx, send(msg), gofuncy.GoOption().WithName("sender-b"))
 
-	_ = gofuncy.Go(ctx, receive(msg), gofuncy.WithName("receiver-c"))
+	gofuncy.Go(ctx, receive(msg), gofuncy.GoOption().WithName("receiver-c"))
 
 	time.Sleep(3 * time.Second)
 }

@@ -59,11 +59,11 @@ func main() {
 
 	l.Info("start")
 
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-a"), gofuncy.WithTracing())
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-b"), gofuncy.WithTracing())
-	_ = gofuncy.Go(ctx, send(msg), gofuncy.WithName("sender-c"), gofuncy.WithTracing())
+	gofuncy.Go(ctx, send(msg), gofuncy.GoOption().WithName("sender-a").WithTracing())
+	gofuncy.Go(ctx, send(msg), gofuncy.GoOption().WithName("sender-b").WithTracing())
+	gofuncy.Go(ctx, send(msg), gofuncy.GoOption().WithName("sender-c").WithTracing())
 
-	_ = gofuncy.Go(ctx, receive(l, msg), gofuncy.WithName("receiver-a"), gofuncy.WithTracing())
+	gofuncy.Go(ctx, receive(l, msg), gofuncy.GoOption().WithName("receiver-a").WithTracing())
 
 	time.Sleep(time.Minute)
 }

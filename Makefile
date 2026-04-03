@@ -52,6 +52,12 @@ lint.fix:
 	@echo "〉golangci-lint run fix"
 	@golangci-lint run --fix
 
+.PHONY: lint.branch
+## Run linter with --new-from-rev=origin/main
+lint.branch:
+	@echo "〉golangci-lint run with --new-from-rev=origin/main"
+	@golangci-lint run --new-from-rev=origin/main
+
 .PHONY: test
 ## Run tests
 test:

@@ -2,18 +2,12 @@ package gofuncy_test
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"testing"
 	"time"
 
 	"github.com/foomo/gofuncy"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
-	"go.opentelemetry.io/otel/sdk/metric/metricdata"
-	sdktrace "go.opentelemetry.io/otel/sdk/trace"
-	"go.opentelemetry.io/otel/sdk/trace/tracetest"
+	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
+	oteltesting "github.com/foomo/opentelemetry-go/testing"
 )
 
 var gofunc = func(ctx context.Context) error {
@@ -48,245 +42,13 @@ func BenchmarkAsync(b *testing.B) {
 	}
 }
 
-func ReportTraces(t *testing.T) {
-	t.Helper()
-
-	traceExporter := tracetest.NewInMemoryExporter()
-	tracerProvider := sdktrace.NewTracerProvider(
-		sdktrace.WithSyncer(traceExporter),
-	)
-
-	otel.SetTracerProvider(tracerProvider)
-
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Second)
-		defer cancel()
-
-		if err := tracerProvider.ForceFlush(ctx); err != nil {
-			t.Fatal(err)
-		}
-
-		spans := traceExporter.GetSpans()
-		if len(spans) > 0 {
-			t.Logf("=== TRACES")
-		}
-
-		printScopeTraces(t, spans)
-
-		if err := tracerProvider.Shutdown(ctx); err != nil {
-			t.Fatal(err)
-		}
-	})
-}
-
-type T interface {
-	Helper()
-	Cleanup(f func())
-	Fatal(args ...any)
-	Logf(format string, args ...any)
-	Context() context.Context
-}
-
-func ReportMetrics(t T) {
-	t.Helper()
-
-	reader := sdkmetric.NewManualReader()
-	meterProvider := sdkmetric.NewMeterProvider(sdkmetric.WithReader(reader))
-
-	otel.SetMeterProvider(meterProvider)
-
-	rm := &metricdata.ResourceMetrics{}
-
-	t.Cleanup(func() {
-		ctx, cancel := context.WithTimeout(context.WithoutCancel(t.Context()), time.Second)
-		defer cancel()
-
-		err := reader.Collect(ctx, rm)
-		if err != nil {
-			t.Fatal(err)
-		}
-
-		if len(rm.ScopeMetrics) > 0 {
-			t.Logf("=== METRICS")
-		}
-
-		printScopeMetrics(t, rm)
-
-		if err := meterProvider.Shutdown(ctx); err != nil {
-			t.Fatal(err)
-		}
-	})
-}
-
-func printScopeMetrics(t T, rm *metricdata.ResourceMetrics) {
-	const (
-		nameWidth = 40
-		sep       = "─"
-	)
-
-	formatAttrs := func(a attribute.Set) string {
-		parts := make([]string, 0, a.Len())
-		for _, v := range a.ToSlice() {
-			parts = append(parts, fmt.Sprintf("%s=%s", string(v.Key), v.Value.Emit()))
-		}
-
-		if len(parts) == 0 {
-			return ""
-		}
-
-		return " {" + strings.Join(parts, ", ") + "}"
-	}
-
-	printHeader := func(name, kind string, attrs attribute.Set) {
-		t.Logf("%-*s [%s]%s\n", nameWidth, name, kind, formatAttrs(attrs))
-		t.Logf("%s\n", strings.Repeat(sep, nameWidth+40))
-	}
-
-	for _, scope := range rm.ScopeMetrics {
-		for _, m := range scope.Metrics {
-			switch agg := m.Data.(type) {
-			case metricdata.Sum[int64]:
-				for _, dp := range agg.DataPoints {
-					printHeader(m.Name, "counter", dp.Attributes)
-					t.Logf("  %-12s %d\n", "value:", dp.Value)
-				}
-			case metricdata.Sum[float64]:
-				for _, dp := range agg.DataPoints {
-					printHeader(m.Name, "counter", dp.Attributes)
-					t.Logf("  %-12s %.3f\n", "value:", dp.Value)
-				}
-			case metricdata.Histogram[float64]:
-				for _, dp := range agg.DataPoints {
-					printHeader(m.Name, "histogram", dp.Attributes)
-
-					// One-line summary - no unit assumption
-					minV, minOk := dp.Min.Value()
-					maxV, maxOk := dp.Max.Value()
-
-					avg := 0.0
-					if minOk && maxOk {
-						avg = (minV + maxV) / 2
-					}
-
-					t.Logf("Summary: Min %.3f, Max %.3f, Avg %.3f, Sum %.3f, Count %d\n\n",
-						minV, maxV, avg, dp.Sum, dp.Count)
-
-					// Buckets table - no unit assumption
-					if len(dp.Bounds) > 0 {
-						t.Logf("Buckets:")
-						t.Logf("┌────────────┬──────────┬─────────┐")
-						t.Logf("│ Range      │ Count    │ %%       │")
-						t.Logf("├────────────┼──────────┼─────────┤")
-
-						total := dp.Count
-						for i, b := range dp.Bounds {
-							pct := float64(dp.BucketCounts[i]) / float64(total) * 100
-							t.Logf("│ %-10.1f │ %-8d │ %6.1f%% │\n", b, dp.BucketCounts[i], pct)
-						}
-
-						t.Logf("└────────────┴──────────┴─────────┘")
-					}
-
-					t.Logf("")
-				}
-			case metricdata.Gauge[int64]:
-				for _, dp := range agg.DataPoints {
-					printHeader(m.Name, "gauge", dp.Attributes)
-					t.Logf("  %-12s %d\n", "value:", dp.Value)
-				}
-			case metricdata.Gauge[float64]:
-				for _, dp := range agg.DataPoints {
-					printHeader(m.Name, "gauge", dp.Attributes)
-					t.Logf("  %-12s %.3f\n", "value:", dp.Value)
-				}
-			}
-		}
-	}
-}
-
-func printScopeTraces(t *testing.T, spans tracetest.SpanStubs) {
-	t.Helper()
-
-	const (
-		nameWidth = 40
-		sep       = "─"
-	)
-
-	for _, s := range spans {
-		duration := s.EndTime.Sub(s.StartTime)
-
-		t.Logf("%-*s [%s] %s\n", nameWidth, s.Name, s.Status.Code, duration)
-		t.Logf("%s\n", strings.Repeat(sep, nameWidth+40))
-
-		printedSomething := false
-
-		if s.SpanKind.String() != "" {
-			t.Logf("├─ Span Kind: %s\n", s.SpanKind)
-
-			printedSomething = true
-		}
-
-		if len(s.Attributes) > 0 {
-			t.Logf("└─ Attributes:\n")
-
-			for i, a := range s.Attributes {
-				var prefix string
-
-				switch {
-				case i == 0, i < len(s.Attributes)-1:
-					prefix = "   ├─ "
-				default:
-					prefix = "   └─ "
-				}
-
-				t.Logf("%s%s: %s\n", prefix, string(a.Key), a.Value.Emit())
-			}
-
-			printedSomething = true
-		}
-
-		if len(s.Events) > 0 && printedSomething {
-			t.Logf("   ")
-			t.Logf("   └─ Events:\n")
-
-			for i, e := range s.Events {
-				var prefix string
-
-				switch {
-				case i == 0, i < len(s.Events)-1:
-					prefix = "      ├─ "
-				default:
-					prefix = "      └─ "
-				}
-
-				t.Logf("%s%s", prefix, e.Name)
-
-				if len(e.Attributes) > 0 {
-					parts := make([]string, 0, len(e.Attributes))
-					for _, a := range e.Attributes {
-						parts = append(parts, fmt.Sprintf("%s=%s", string(a.Key), a.Value.Emit()))
-					}
-
-					t.Logf(" {%s}", strings.Join(parts, ", "))
-				}
-
-				t.Log()
-			}
-		}
-
-		if printedSomething || len(s.Events) > 0 {
-			t.Log()
-		}
-	}
-}
-
 func BenchmarkAsync_withName(b *testing.B) {
 	b.ReportAllocs()
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.WithName("benchmark-routine"),
+			gofuncy.AsyncOption().WithName("benchmark-routine"),
 		)
 		<-errChan
 	}
@@ -298,46 +60,49 @@ func BenchmarkAsync_withTracing(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.WithTracing(),
+			gofuncy.AsyncOption().WithTracing(),
 		)
 		<-errChan
 	}
 }
 
 func BenchmarkAsync_withCounterMetric(b *testing.B) {
-	ReportMetrics(b)
 	b.ReportAllocs()
+	oteltesting.ReportMetrics(b, glossymetric.NewTest(b))
+
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.WithCounterMetric(),
+			gofuncy.AsyncOption().WithCounterMetric(),
 		)
 		<-errChan
 	}
 }
 
 func BenchmarkAsync_withUpDownMetric(b *testing.B) {
-	ReportMetrics(b)
 	b.ReportAllocs()
+	oteltesting.ReportMetrics(b, glossymetric.NewTest(b))
+
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.WithUpDownMetric(),
+			gofuncy.AsyncOption().WithUpDownMetric(),
 		)
 		<-errChan
 	}
 }
 
 func BenchmarkAsync_withDurationMetric(b *testing.B) {
-	ReportMetrics(b)
 	b.ReportAllocs()
+	oteltesting.ReportMetrics(b, glossymetric.NewTest(b))
+
 	ctx := gofuncy.Ctx(b.Context()).Root()
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.WithDurationMetric(),
+			gofuncy.AsyncOption().WithDurationMetric(),
 		)
 		<-errChan
 	}

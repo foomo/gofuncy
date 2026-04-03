@@ -2,6 +2,7 @@ package gofuncy
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"runtime"
 	"strings"
@@ -14,9 +15,9 @@ import (
 )
 
 // Go spawns a fire-and-forget goroutine with panic recovery.
-// Errors are logged via slog by default; use WithErrorHandler to override.
-func Go(ctx context.Context, fn Func, opts ...Option) {
-	o := getOptions(opts)
+// Errors are logged via slog by default; use GoOption().WithErrorHandler to override.
+func Go(ctx context.Context, fn Func, opts ...*OptionsBuilder) {
+	o := newOptions(opts)
 
 	// capture error handler and logger before passing options to goroutine
 	errorHandler := o.errorHandler
@@ -28,7 +29,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 	traceAttrs := traceAttrsBuf[:0]
 
 	if o.tracing {
-		if pc, file, line, ok := runtime.Caller(1); ok {
+		if pc, file, line, ok := runtime.Caller(o.callerSkip + 1); ok {
 			traceAttrs = append(traceAttrs,
 				otelsemconv.CodeFilePath(file),
 				otelsemconv.CodeLineNumber(line),
@@ -37,12 +38,26 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 		}
 	}
 
-	go func(ctx context.Context, o *options) {
-		defer optionsPool.Put(o)
+	go func(ctx context.Context, o *GoOptions) {
+		var (
+			err           error
+			cancel        context.CancelFunc
+			cancelTimeout context.CancelFunc
+		)
 
-		var err error
+		ctx, cancel = context.WithCancel(ctx)
+		defer cancel()
 
-		defer func() {
+		if o.timeout > 0 {
+			ctx, cancelTimeout = context.WithTimeout(ctx, o.timeout)
+			defer cancelTimeout()
+		}
+
+		defer func(ctx context.Context) {
+			if ctx.Err() != nil {
+				err = errors.Join(err, ctx.Err())
+			}
+
 			if err == nil {
 				return
 			}
@@ -54,7 +69,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 			}
 
 			if l != nil {
-				l.WarnContext(ctx, "gofuncy.go error",
+				l.ErrorContext(ctx, "gofuncy.go error",
 					"name", o.name,
 					"err", err,
 				)
@@ -66,14 +81,7 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 				"name", o.name,
 				"err", err,
 			)
-		}()
-
-		defer recoverError(&err)
-
-		if ctx.Err() != nil {
-			err = ctx.Err()
-			return
-		}
+		}(ctx)
 
 		start := time.Now()
 		routineName := NameFromContext(ctx)
@@ -102,6 +110,13 @@ func Go(ctx context.Context, fn Func, opts ...Option) {
 
 				span.End()
 			}()
+		}
+
+		defer recoverError(&err)
+
+		if ctx.Err() != nil {
+			err = ctx.Err()
+			return
 		}
 
 		// create metrics if enabled

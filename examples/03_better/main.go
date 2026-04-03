@@ -23,11 +23,11 @@ func main() {
 
 	fmt.Println("start")
 
-	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-a"))
-	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-b"))
-	_ = gofuncy.Go(ctx, send(ch), gofuncy.WithName("sender-c"))
+	gofuncy.Go(ctx, send(ch), gofuncy.GoOption().WithName("sender-a"))
+	gofuncy.Go(ctx, send(ch), gofuncy.GoOption().WithName("sender-b"))
+	gofuncy.Go(ctx, send(ch), gofuncy.GoOption().WithName("sender-c"))
 
-	_ = gofuncy.Go(ctx, receive(ch), gofuncy.WithName("receiver-a"))
+	gofuncy.Go(ctx, receive(ch), gofuncy.GoOption().WithName("receiver-a"))
 	_ = receive(ch)(ctx)
 
 	fmt.Println("done")

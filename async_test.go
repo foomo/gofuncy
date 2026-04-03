@@ -9,6 +9,9 @@ import (
 	"time"
 
 	"github.com/foomo/gofuncy"
+	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
+	"github.com/foomo/opentelemetry-go/exporters/glossy/glossytrace"
+	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -37,22 +40,18 @@ func ExampleAsyncBackground() {
 }
 
 func TestAsync_withName(t *testing.T) {
-	t.Parallel()
-
 	expected := "gofuncy_test"
 	errChan := gofuncy.Async(t.Context(),
 		func(ctx context.Context) error {
 			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
 			return nil
 		},
-		gofuncy.WithName(expected),
+		gofuncy.AsyncOption().WithName(expected),
 	)
 	assert.NoError(t, <-errChan)
 }
 
 func TestAsync_withContextCancel(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -66,8 +65,6 @@ func TestAsync_withContextCancel(t *testing.T) {
 }
 
 func TestAsync_withContextCanceled(t *testing.T) {
-	t.Parallel()
-
 	ctx, cancel := context.WithCancel(t.Context())
 	errChan := gofuncy.Async(ctx,
 		func(ctx context.Context) error {
@@ -80,8 +77,6 @@ func TestAsync_withContextCanceled(t *testing.T) {
 }
 
 func TestAsync_withNilOption(t *testing.T) {
-	t.Parallel()
-
 	var called atomic.Bool
 
 	errChan := gofuncy.Async(t.Context(),
@@ -89,7 +84,7 @@ func TestAsync_withNilOption(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		nil, // passing nil option should not panic
+		nil, // passing nil builder should not panic
 	)
 
 	require.NoError(t, <-errChan)
@@ -97,9 +92,7 @@ func TestAsync_withNilOption(t *testing.T) {
 }
 
 func TestAsync_withTracing(t *testing.T) {
-	t.Parallel()
-
-	ReportTraces(t)
+	oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
 	var called atomic.Bool
 
@@ -108,7 +101,7 @@ func TestAsync_withTracing(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithTracing(),
+		gofuncy.AsyncOption().WithTracing(),
 	)
 
 	require.NoError(t, <-errChan)
@@ -116,9 +109,7 @@ func TestAsync_withTracing(t *testing.T) {
 }
 
 func TestAsync_withCounterMetric(t *testing.T) {
-	t.Parallel()
-
-	ReportMetrics(t)
+	oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	var called atomic.Bool
 
@@ -127,7 +118,7 @@ func TestAsync_withCounterMetric(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithCounterMetric(),
+		gofuncy.AsyncOption().WithCounterMetric(),
 	)
 
 	require.NoError(t, <-errChan)
@@ -135,9 +126,7 @@ func TestAsync_withCounterMetric(t *testing.T) {
 }
 
 func TestAsync_withUpDownMetric(t *testing.T) {
-	t.Parallel()
-
-	ReportMetrics(t)
+	oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	var called atomic.Bool
 
@@ -146,7 +135,7 @@ func TestAsync_withUpDownMetric(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.WithUpDownMetric(),
+		gofuncy.AsyncOption().WithUpDownMetric(),
 	)
 
 	require.NoError(t, <-errChan)
@@ -154,9 +143,7 @@ func TestAsync_withUpDownMetric(t *testing.T) {
 }
 
 func TestAsync_withDurationMetric(t *testing.T) {
-	t.Parallel()
-
-	ReportMetrics(t)
+	oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	var called atomic.Bool
 
@@ -167,7 +154,7 @@ func TestAsync_withDurationMetric(t *testing.T) {
 
 			return nil
 		},
-		gofuncy.WithDurationMetric(),
+		gofuncy.AsyncOption().WithDurationMetric(),
 	)
 
 	require.NoError(t, <-errChan)
@@ -175,8 +162,6 @@ func TestAsync_withDurationMetric(t *testing.T) {
 }
 
 func TestAsync_contextNamePropagation(t *testing.T) {
-	t.Parallel()
-
 	parentName := "parent-routine"
 
 	var childName string
@@ -194,12 +179,12 @@ func TestAsync_contextNamePropagation(t *testing.T) {
 
 					return nil
 				},
-				gofuncy.WithName("child-routine"),
+				gofuncy.AsyncOption().WithName("child-routine"),
 			)
 
 			return <-childErrChan
 		},
-		gofuncy.WithName(parentName),
+		gofuncy.AsyncOption().WithName(parentName),
 	)
 
 	err := <-errChan
@@ -211,8 +196,6 @@ func TestAsync_contextNamePropagation(t *testing.T) {
 }
 
 func TestAsync_concurrent(t *testing.T) {
-	t.Parallel()
-
 	const numGoroutines = 100
 
 	var wg sync.WaitGroup
@@ -231,7 +214,7 @@ func TestAsync_concurrent(t *testing.T) {
 				func(ctx context.Context) error {
 					return nil
 				},
-				gofuncy.WithName(fmt.Sprintf("goroutine-%d", idx)),
+				gofuncy.AsyncOption().WithName(fmt.Sprintf("goroutine-%d", idx)),
 			)
 
 			if err := <-errChan; err != nil {
@@ -249,8 +232,6 @@ func TestAsync_concurrent(t *testing.T) {
 }
 
 func TestAsync_panicRecovery(t *testing.T) {
-	t.Parallel()
-
 	errChan := gofuncy.Async(t.Context(),
 		func(ctx context.Context) error {
 			panic("test panic")

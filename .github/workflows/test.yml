@@ -43,7 +43,7 @@ jobs:
         run: make generate && git diff --exit-code
 
       - name: Run lint
-        run: make lint
+        run: make lint.branch
 
       - name: Run tests
         run: make test

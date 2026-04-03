@@ -6,14 +6,34 @@ import (
 	"testing"
 	"time"
 
+	testingx "github.com/foomo/go/testing"
 	"github.com/foomo/gofuncy"
+	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
+	"github.com/foomo/opentelemetry-go/exporters/glossy/glossytrace"
+	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
 )
 
+type RunFunc func() int
+
+func M(m *testing.M, fn func(m *testing.M) RunFunc) RunFunc {
+	return fn(m)
+}
+
+func (r RunFunc) Run() int {
+
+	return r()
+}
+
 func TestMain(m *testing.M) {
-	goleak.VerifyTestMain(m)
+	_, flush := oteltesting.TestMainReportMetrics(m, glossymetric.NewTestMain(m))
+	goleak.VerifyTestMain(testingx.MFunc(func() int {
+		i := m.Run()
+		flush()
+		return i
+	}))
 }
 
 func ExampleGo() {
@@ -33,8 +53,6 @@ func ExampleGo() {
 }
 
 func TestGo_basic(t *testing.T) {
-	t.Parallel()
-
 	done := make(chan struct{})
 
 	gofuncy.Go(t.Context(),
@@ -52,8 +70,7 @@ func TestGo_basic(t *testing.T) {
 }
 
 func TestGo_withTracing(t *testing.T) {
-	t.Parallel()
-	ReportTraces(t)
+	oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
 	done := make(chan struct{})
 
@@ -62,7 +79,7 @@ func TestGo_withTracing(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithTracing(),
+		gofuncy.GoOption().WithTracing(),
 	)
 
 	select {
@@ -74,8 +91,8 @@ func TestGo_withTracing(t *testing.T) {
 
 func TestGo_withCounterMetric(t *testing.T) {
 	t.Parallel()
-
-	ReportMetrics(t)
+	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
+	// defer flush()
 
 	done := make(chan struct{})
 
@@ -84,7 +101,7 @@ func TestGo_withCounterMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithCounterMetric(),
+		gofuncy.GoOption().WithCounterMetric(),
 	)
 
 	select {
@@ -96,8 +113,8 @@ func TestGo_withCounterMetric(t *testing.T) {
 
 func TestGo_withUpDownMetric(t *testing.T) {
 	t.Parallel()
-
-	ReportMetrics(t)
+	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
+	// defer flush()
 
 	done := make(chan struct{})
 
@@ -106,7 +123,7 @@ func TestGo_withUpDownMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithUpDownMetric(),
+		gofuncy.GoOption().WithUpDownMetric(),
 	)
 
 	select {
@@ -118,8 +135,8 @@ func TestGo_withUpDownMetric(t *testing.T) {
 
 func TestGo_withDurationMetric(t *testing.T) {
 	t.Parallel()
-
-	ReportMetrics(t)
+	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
+	// defer flush()
 
 	done := make(chan struct{})
 
@@ -128,7 +145,7 @@ func TestGo_withDurationMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithDurationMetric(),
+		gofuncy.GoOption().WithDurationMetric(),
 	)
 
 	select {
@@ -139,15 +156,13 @@ func TestGo_withDurationMetric(t *testing.T) {
 }
 
 func TestGo_errorHandler(t *testing.T) {
-	t.Parallel()
-
 	errCh := make(chan error, 1)
 
 	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			return fmt.Errorf("test error")
 		},
-		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -161,15 +176,13 @@ func TestGo_errorHandler(t *testing.T) {
 }
 
 func TestGo_panicRecovery(t *testing.T) {
-	t.Parallel()
-
 	errCh := make(chan error, 1)
 
 	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			panic("fire and forget panic")
 		},
-		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -184,9 +197,7 @@ func TestGo_panicRecovery(t *testing.T) {
 	}
 }
 
-func TestGo_contextCanceled(t *testing.T) {
-	t.Parallel()
-
+func TestGo_canceledContext(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
@@ -196,7 +207,30 @@ func TestGo_contextCanceled(t *testing.T) {
 		func(ctx context.Context) error {
 			return nil
 		},
-		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
+			errCh <- err
+		}),
+	)
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.Canceled)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for context error")
+	}
+}
+
+func TestGo_contextCanceled(t *testing.T) {
+	ctx, cancel := context.WithCancel(t.Context())
+
+	errCh := make(chan error, 1)
+
+	gofuncy.Go(ctx,
+		func(ctx context.Context) error {
+			cancel()
+			return nil
+		},
+		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)

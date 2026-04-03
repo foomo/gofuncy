@@ -1,4 +1,3 @@
-# https://golangci-lint.run/usage/configuration/
 # yaml-language-server: $schema=https://golangci-lint.run/jsonschema/golangci.jsonschema.json
 version: "2"
 
@@ -66,6 +65,11 @@ linters:
       rules:
         - name: package-comments
           disabled: true
+    # https://golangci-lint.run/docs/linters/configuration/#gomoddirectives
+    gomoddirectives:
+      tool-forbidden: true
+      toolchain-forbidden: true
+      go-version-pattern: '\d\.\d+'
   exclusions:
     presets:
       - comments
@@ -79,6 +83,8 @@ linters:
     paths:
       - docs
       - tmp
+
+# https://golangci-lint.run/docs/formatters/
 formatters:
   enable:
     - gofmt

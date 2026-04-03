@@ -136,7 +136,7 @@ func TestMap_failFast(t *testing.T) {
 
 			return 0, ctx.Err()
 		},
-		gofuncy.WithFailFast(),
+		gofuncy.MapOption().WithFailFast(),
 	)
 
 	require.Error(t, err)
@@ -176,7 +176,7 @@ func TestMap_withLimit(t *testing.T) {
 
 			return v * 2, nil
 		},
-		gofuncy.WithLimit(limit),
+		gofuncy.MapOption().WithLimit(limit),
 	)
 
 	require.NoError(t, err)

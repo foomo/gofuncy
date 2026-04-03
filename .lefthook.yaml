@@ -21,7 +21,6 @@ pre-commit:
       glob: "*.go"
       run: golangci-lint run --new --fast-only
 
-
 commit-msg:
   skip: [ merge, rebase ]
   commands:
@@ -32,7 +31,7 @@ commit-msg:
         # Regex for conventional commits (type(scope?): subject)
         regex="^(build|chore|ci|docs|feat|fix|perf|refactor|style|test|sec|wip|revert)(\([a-z0-9\-]+\))?(!)?: .{1,50}"
         if ! echo "$commit_msg" | grep -qE "$regex"; then
-          echo "Error: Commit message does not follow Conventional Commits format."
+          echo "❌ Commit message does not follow Conventional Commits format."
           echo "Format: type(scope?): subject"
           echo "Example: feat(login): add remember me option"
           exit 1
@@ -42,3 +41,14 @@ post-checkout:
   commands:
     mise:
       run: mise -q install
+
+tags:
+  commands:
+    semver:
+      run: |
+        TAG_NAME=$(git describe --tags --exact-match)
+        if [[ ! $TAG_NAME =~ ^v([0-9]+)\.([0-9]+)\.([0-9]+)(-[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?(\+[0-9A-Za-z-]+(\.[0-9A-Za-z-]+)*)?$ ]]; then
+          echo "❌ Invalid SemVer: $TAG_NAME"
+          echo "Must be: vMAJOR.MINOR.PATCH[-prerelease][+build]"
+          exit 1
+        fi

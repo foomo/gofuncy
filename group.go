@@ -13,29 +13,28 @@ import (
 
 // Group runs all functions concurrently and waits for all to complete.
 // Returns errors.Join of all failures, nil if all succeed.
-// Use WithFailFast to cancel remaining on first error.
-// Use WithLimit(n) to bound concurrent goroutines.
-func Group(ctx context.Context, fns []Func, opts ...Option) error {
+// Use GroupOption().WithFailFast() to cancel remaining on first error.
+// Use GroupOption().WithLimit(n) to bound concurrent goroutines.
+func Group(ctx context.Context, fns []Func, opts ...*GroupOptionsBuilder) error {
 	if len(fns) == 0 {
 		return nil
 	}
 
-	o := getOptions(opts)
-	defer optionsPool.Put(o)
+	o := newGroupOptions(opts)
 
-	errs := run(ctx, fns, o)
+	errs := run(ctx, fns, &o.concurrentOptions)
 
 	return errors.Join(errs...)
 }
 
 // GroupBackground is like Group but detaches from the parent context's cancellation.
 // The goroutines will continue running even if the parent context is canceled.
-func GroupBackground(ctx context.Context, fns []Func, opts ...Option) error {
+func GroupBackground(ctx context.Context, fns []Func, opts ...*GroupOptionsBuilder) error {
 	return Group(context.WithoutCancel(ctx), fns, opts...)
 }
 
 // run is the shared execution engine for Group and Map.
-func run(ctx context.Context, fns []Func, o *options) []error {
+func run(ctx context.Context, fns []Func, o *concurrentOptions) []error {
 	errs := make([]error, len(fns))
 
 	if o.failFast {
@@ -50,7 +49,7 @@ func run(ctx context.Context, fns []Func, o *options) []error {
 	return errs
 }
 
-func runAll(ctx context.Context, fns []Func, errs []error, o *options, cancelOnErr context.CancelFunc) {
+func runAll(ctx context.Context, fns []Func, errs []error, o *concurrentOptions, cancelOnErr context.CancelFunc) {
 	var wg sync.WaitGroup
 	wg.Add(len(fns))
 

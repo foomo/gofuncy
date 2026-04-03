@@ -1,6 +1,11 @@
 package gofuncy
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+)
 
 // GroupOptions holds configuration for Group and GroupBackground.
 type GroupOptions struct {
@@ -109,6 +114,24 @@ func (b *GroupOptionsBuilder) WithLimit(n int) *GroupOptionsBuilder {
 func (b *GroupOptionsBuilder) WithFailFast() *GroupOptionsBuilder {
 	b.Opts = append(b.Opts, func(o *GroupOptions) error {
 		o.failFast = true
+		return nil
+	})
+
+	return b
+}
+
+func (b *GroupOptionsBuilder) WithMeterProvider(mp metric.MeterProvider) *GroupOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *GroupOptions) error {
+		o.meterProvider = mp
+		return nil
+	})
+
+	return b
+}
+
+func (b *GroupOptionsBuilder) WithTracerProvider(tp trace.TracerProvider) *GroupOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *GroupOptions) error {
+		o.tracerProvider = tp
 		return nil
 	})
 

@@ -3,13 +3,14 @@ package gofuncy
 import (
 	"context"
 	"runtime"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/foomo/gofuncy/semconv"
 )
 
 // Async spawns a single goroutine and returns its error channel.
@@ -67,18 +68,14 @@ func Async(ctx context.Context, fn Func, opts ...*AsyncOptionsBuilder) <-chan er
 				l = l.With("gofuncy_parent", routineName)
 			}
 
-			traceAttrs = append(traceAttrs, attribute.String("gofuncy.routine.parent", routineName))
+			traceAttrs = append(traceAttrs, semconv.RoutineParent(routineName))
 		}
 
 		var span trace.Span
 
 		if o.tracing {
-			var sb strings.Builder
-			sb.WriteString("gofuncy.async ")
-			sb.WriteString(o.name)
-
-			ctx, span = tracer.Start(ctx,
-				sb.String(),
+			ctx, span = resolveTracer(o.tracerProvider).Start(ctx,
+				"gofuncy.async "+o.name,
 				trace.WithAttributes(traceAttrs...),
 			)
 
@@ -122,7 +119,7 @@ func Async(ctx context.Context, fn Func, opts ...*AsyncOptionsBuilder) <-chan er
 
 		// create metrics if enabled
 		if o.upDownMetric || o.counterMetric || o.durationMetric {
-			inst, _ := initInstrumentation()
+			inst := resolveInstrumentation(o.meterProvider)
 
 			if o.upDownMetric {
 				inst.incGoroutine(ctx, o.name)

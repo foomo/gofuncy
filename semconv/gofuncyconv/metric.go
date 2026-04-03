@@ -2,7 +2,6 @@ package gofuncyconv
 
 import (
 	"context"
-	"sync"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/metric"
@@ -42,49 +41,6 @@ const (
 	unitMessage   = "{message}"
 )
 
-var (
-	addOptionPool = sync.Pool{New: func() any {
-		s := make([]metric.AddOption, 0, 4)
-		return &s
-	}}
-	recordOptionPool = sync.Pool{New: func() any {
-		s := make([]metric.RecordOption, 0, 4)
-		return &s
-	}}
-)
-
-func getAddOptions(attrs []attribute.KeyValue, extra ...attribute.KeyValue) []metric.AddOption {
-	p, ok := addOptionPool.Get().(*[]metric.AddOption)
-	if !ok {
-		p = &[]metric.AddOption{}
-	}
-
-	opts := (*p)[:0]
-	opts = append(opts, metric.WithAttributes(append(attrs, extra...)...))
-
-	return opts
-}
-
-func putAddOptions(opts []metric.AddOption) {
-	addOptionPool.Put(&opts)
-}
-
-func getRecordOptions(attrs []attribute.KeyValue, extra ...attribute.KeyValue) []metric.RecordOption {
-	p, ok := recordOptionPool.Get().(*[]metric.RecordOption)
-	if !ok {
-		p = &[]metric.RecordOption{}
-	}
-
-	opts := (*p)[:0]
-	opts = append(opts, metric.WithAttributes(append(attrs, extra...)...))
-
-	return opts
-}
-
-func putRecordOptions(opts []metric.RecordOption) {
-	recordOptionPool.Put(&opts)
-}
-
 // default histogram bucket boundaries for goroutine/group durations
 var durationBuckets = metric.WithExplicitBucketBoundaries(
 	0.001, 0.005, 0.01, 0.05, 0.1, 0.5, 1.0, 5.0, 10.0, 30.0, 60.0, 300.0, 600.0,
@@ -122,12 +78,7 @@ func (g GoroutinesTotal) Add(ctx context.Context, incr int64, routineName string
 		return
 	}
 
-	base := []attribute.KeyValue{semconv.RoutineName(routineName)}
-	opts := getAddOptions(base, attrs...)
-
-	g.inst.Add(ctx, incr, opts...)
-
-	putAddOptions(opts)
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -162,12 +113,7 @@ func (g GoroutinesCurrent) Add(ctx context.Context, incr int64, routineName stri
 		return
 	}
 
-	base := []attribute.KeyValue{semconv.RoutineName(routineName)}
-	opts := getAddOptions(base, attrs...)
-
-	g.inst.Add(ctx, incr, opts...)
-
-	putAddOptions(opts)
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -203,15 +149,10 @@ func (g GoroutinesDuration) Record(ctx context.Context, value float64, routineNa
 		return
 	}
 
-	base := []attribute.KeyValue{
+	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs,
 		semconv.RoutineName(routineName),
-		attribute.Bool("error", hasError),
-	}
-	opts := getRecordOptions(base, attrs...)
-
-	g.inst.Record(ctx, value, opts...)
-
-	putRecordOptions(opts)
+		semconv.Error(hasError),
+	)...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -247,16 +188,11 @@ func (g GroupsDuration) Record(ctx context.Context, value float64, routineName s
 		return
 	}
 
-	base := []attribute.KeyValue{
+	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs,
 		semconv.RoutineName(routineName),
-		attribute.Bool("error", hasError),
+		semconv.Error(hasError),
 		semconv.GroupSize(groupSize),
-	}
-	opts := getRecordOptions(base, attrs...)
-
-	g.inst.Record(ctx, value, opts...)
-
-	putRecordOptions(opts)
+	)...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -291,12 +227,7 @@ func (g ChansCurrent) Add(ctx context.Context, incr int64, chanName string, attr
 		return
 	}
 
-	base := []attribute.KeyValue{semconv.ChanName(chanName)}
-	opts := getAddOptions(base, attrs...)
-
-	g.inst.Add(ctx, incr, opts...)
-
-	putAddOptions(opts)
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.ChanName(chanName))...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -331,12 +262,7 @@ func (g MessagesCurrent) Add(ctx context.Context, incr int64, chanName string, a
 		return
 	}
 
-	base := []attribute.KeyValue{semconv.ChanName(chanName)}
-	opts := getAddOptions(base, attrs...)
-
-	g.inst.Add(ctx, incr, opts...)
-
-	putAddOptions(opts)
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.ChanName(chanName))...))
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -356,6 +282,7 @@ func NewMessagesDuration(m metric.Meter) (MessagesDuration, error) {
 	h, err := m.Float64Histogram(messagesDurationName,
 		metric.WithDescription(messagesDurationDesc),
 		metric.WithUnit(unitSeconds),
+		durationBuckets,
 	)
 
 	return MessagesDuration{inst: h}, err
@@ -371,10 +298,5 @@ func (g MessagesDuration) Record(ctx context.Context, value float64, chanName st
 		return
 	}
 
-	base := []attribute.KeyValue{semconv.ChanName(chanName)}
-	opts := getRecordOptions(base, attrs...)
-
-	g.inst.Record(ctx, value, opts...)
-
-	putRecordOptions(opts)
+	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs, semconv.ChanName(chanName))...))
 }

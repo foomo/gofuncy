@@ -5,13 +5,14 @@ import (
 	"errors"
 	"log/slog"
 	"runtime"
-	"strings"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/foomo/gofuncy/semconv"
 )
 
 // Go spawns a fire-and-forget goroutine with panic recovery.
@@ -87,18 +88,14 @@ func Go(ctx context.Context, fn Func, opts ...*OptionsBuilder) {
 		routineName := NameFromContext(ctx)
 
 		if routineName != NameNoName {
-			traceAttrs = append(traceAttrs, attribute.String("gofuncy.routine.parent", routineName))
+			traceAttrs = append(traceAttrs, semconv.RoutineParent(routineName))
 		}
 
 		var span trace.Span
 
 		if o.tracing {
-			var sb strings.Builder
-			sb.WriteString("gofuncy.go ")
-			sb.WriteString(o.name)
-
-			ctx, span = tracer.Start(ctx,
-				sb.String(),
+			ctx, span = resolveTracer(o.tracerProvider).Start(ctx,
+				"gofuncy.go "+o.name,
 				trace.WithAttributes(traceAttrs...),
 			)
 
@@ -121,7 +118,7 @@ func Go(ctx context.Context, fn Func, opts ...*OptionsBuilder) {
 
 		// create metrics if enabled
 		if o.upDownMetric || o.counterMetric || o.durationMetric {
-			inst, _ := initInstrumentation()
+			inst := resolveInstrumentation(o.meterProvider)
 
 			if o.upDownMetric {
 				inst.incGoroutine(ctx, o.name)

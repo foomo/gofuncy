@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/metric"
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -27,6 +28,9 @@ type (
 		counterMetricEnabled          bool
 		messagesDurationMetricEnabled bool
 		messagesAttributeEnabled      bool
+		// telemetry providers
+		meterProvider  metric.MeterProvider
+		tracerProvider trace.TracerProvider
 		// closing
 		isClosed atomic.Bool
 		closing  chan struct{}
@@ -80,6 +84,18 @@ func ChanWithMessagesAttributeEnabled[T any](enabled bool) ChanOption[T] {
 	}
 }
 
+func ChanWithMeterProvider[T any](mp metric.MeterProvider) ChanOption[T] {
+	return func(o *Chan[T]) {
+		o.meterProvider = mp
+	}
+}
+
+func ChanWithTracerProvider[T any](tp trace.TracerProvider) ChanOption[T] {
+	return func(o *Chan[T]) {
+		o.tracerProvider = tp
+	}
+}
+
 // ------------------------------------------------------------------------------------------------
 // ~ Constructor
 // ------------------------------------------------------------------------------------------------
@@ -109,7 +125,7 @@ func NewChan[T any](opts ...ChanOption[T]) *Chan[T] {
 
 	// create counter metric if enabled
 	if inst.counterMetricEnabled {
-		chansCurrentMetric().Add(context.Background(), 1, inst.name)
+		resolveChansCurrent(inst.meterProvider).Add(context.Background(), 1, inst.name)
 	}
 
 	return inst
@@ -131,7 +147,7 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 	}
 
 	if g.tracingEnabled {
-		ctx, span = tracer.Start(ctx, "gofuncy.chan.receive "+g.name, trace.WithAttributes(
+		ctx, span = resolveTracer(g.tracerProvider).Start(ctx, "gofuncy.chan.receive "+g.name, trace.WithAttributes(
 			semconv.ChanCap(cap(g.channel)),
 			semconv.ChanSize(len(g.channel)),
 		))
@@ -166,7 +182,7 @@ func (g *Chan[T]) Receive(ctx context.Context) <-chan T {
 		}
 
 		if g.counterMetricEnabled {
-			messagesCurrentMetric().Add(ctx, -1, g.name)
+			resolveMessagesCurrent(g.meterProvider).Add(ctx, -1, g.name)
 		}
 
 		if l != nil {
@@ -207,7 +223,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 
 	var span trace.Span
 	if g.tracingEnabled {
-		ctx, span = tracer.Start(ctx, "gofuncy.chan.send "+g.name, trace.WithAttributes(
+		ctx, span = resolveTracer(g.tracerProvider).Start(ctx, "gofuncy.chan.send "+g.name, trace.WithAttributes(
 			semconv.ChanCap(cap(g.channel)),
 			semconv.ChanSize(len(g.channel)),
 			attribute.Int("messages.total", len(values)),
@@ -231,7 +247,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 	}
 
 	if g.counterMetricEnabled {
-		messagesCurrentMetric().Add(ctx, int64(len(values)), g.name)
+		resolveMessagesCurrent(g.meterProvider).Add(ctx, int64(len(values)), g.name)
 	}
 
 	for _, data := range values {
@@ -244,7 +260,7 @@ func (g *Chan[T]) Send(ctx context.Context, values ...T) error {
 			return ErrChanClosed
 		case g.channel <- g.newMessage(span, l, routineName, data):
 			if g.messagesDurationMetricEnabled {
-				messagesDurationMetric().Record(ctx, time.Since(s).Truncate(time.Millisecond).Seconds(), g.name)
+				resolveMessagesDuration(g.meterProvider).Record(ctx, time.Since(s).Truncate(time.Millisecond).Seconds(), g.name)
 			}
 		}
 	}
@@ -271,7 +287,7 @@ func (g *Chan[T]) ReceiveValue(ctx context.Context) (T, bool) {
 	}
 
 	if g.tracingEnabled {
-		ctx, span = tracer.Start(ctx, "gofuncy.chan.receive "+g.name, trace.WithAttributes(
+		ctx, span = resolveTracer(g.tracerProvider).Start(ctx, "gofuncy.chan.receive "+g.name, trace.WithAttributes(
 			semconv.ChanCap(cap(g.channel)),
 			semconv.ChanSize(len(g.channel)),
 		))
@@ -304,7 +320,7 @@ func (g *Chan[T]) ReceiveValue(ctx context.Context) (T, bool) {
 		}
 
 		if g.counterMetricEnabled {
-			messagesCurrentMetric().Add(ctx, -1, g.name)
+			resolveMessagesCurrent(g.meterProvider).Add(ctx, -1, g.name)
 		}
 
 		if l != nil {
@@ -344,7 +360,7 @@ func (g *Chan[T]) Close() {
 	}
 
 	if g.counterMetricEnabled {
-		chansCurrentMetric().Add(context.Background(), -1, g.name)
+		resolveChansCurrent(g.meterProvider).Add(context.Background(), -1, g.name)
 	}
 
 	close(g.closing)

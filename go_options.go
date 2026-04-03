@@ -5,6 +5,8 @@ import (
 	"time"
 
 	optionx "github.com/foomo/go/option"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 // GoOptions holds configuration for Go and GoBackground.
@@ -94,6 +96,22 @@ func (b *OptionsBuilder) WithCounterMetric() *OptionsBuilder {
 func (b *OptionsBuilder) WithErrorHandler(h ErrorHandler) *OptionsBuilder {
 	b.Opts = append(b.Opts, func(o *GoOptions) {
 		o.errorHandler = h
+	})
+
+	return b
+}
+
+func (b *OptionsBuilder) WithMeterProvider(mp metric.MeterProvider) *OptionsBuilder {
+	b.Opts = append(b.Opts, func(o *GoOptions) {
+		o.meterProvider = mp
+	})
+
+	return b
+}
+
+func (b *OptionsBuilder) WithTracerProvider(tp trace.TracerProvider) *OptionsBuilder {
+	b.Opts = append(b.Opts, func(o *GoOptions) {
+		o.tracerProvider = tp
 	})
 
 	return b

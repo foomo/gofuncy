@@ -1,6 +1,11 @@
 package gofuncy
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+)
 
 // MapOptions holds configuration for Map and MapBackground.
 type MapOptions struct {
@@ -109,6 +114,24 @@ func (b *MapOptionsBuilder) WithLimit(n int) *MapOptionsBuilder {
 func (b *MapOptionsBuilder) WithFailFast() *MapOptionsBuilder {
 	b.Opts = append(b.Opts, func(o *MapOptions) error {
 		o.failFast = true
+		return nil
+	})
+
+	return b
+}
+
+func (b *MapOptionsBuilder) WithMeterProvider(mp metric.MeterProvider) *MapOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *MapOptions) error {
+		o.meterProvider = mp
+		return nil
+	})
+
+	return b
+}
+
+func (b *MapOptionsBuilder) WithTracerProvider(tp trace.TracerProvider) *MapOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *MapOptions) error {
+		o.tracerProvider = tp
 		return nil
 	})
 

@@ -6,9 +6,10 @@ import (
 	"sync"
 	"time"
 
-	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
+
+	"github.com/foomo/gofuncy/semconv"
 )
 
 // Group runs all functions concurrently and waits for all to complete.
@@ -65,16 +66,19 @@ func runAll(ctx context.Context, fns []Func, errs []error, o *concurrentOptions,
 		start time.Time
 	)
 
+	if o.tracing || o.durationMetric {
+		start = time.Now()
+	}
+
 	if o.tracing {
 		var traceCtx context.Context
 
-		traceCtx, span = tracer.Start(ctx, "gofuncy.group "+o.name,
+		traceCtx, span = resolveTracer(o.tracerProvider).Start(ctx, "gofuncy.group "+o.name,
 			trace.WithAttributes(
-				attribute.Int("gofuncy.group.size", len(fns)),
+				semconv.GroupSize(len(fns)),
 			),
 		)
 		ctx = traceCtx
-		start = time.Now()
 
 		defer func() {
 			hasErr := false
@@ -95,10 +99,6 @@ func runAll(ctx context.Context, fns []Func, errs []error, o *concurrentOptions,
 
 			span.End()
 		}()
-	}
-
-	if o.durationMetric {
-		start = time.Now()
 	}
 
 	for i, fn := range fns {
@@ -131,7 +131,7 @@ func runAll(ctx context.Context, fns []Func, errs []error, o *concurrentOptions,
 
 	// record group duration metric
 	if o.durationMetric {
-		inst, _ := initInstrumentation()
+		inst := resolveInstrumentation(o.meterProvider)
 
 		hasErr := false
 

@@ -3,6 +3,9 @@ package gofuncy
 import (
 	"log/slog"
 	"time"
+
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
 )
 
 type baseOptions struct {
@@ -16,6 +19,9 @@ type baseOptions struct {
 	upDownMetric   bool
 	counterMetric  bool
 	durationMetric bool
+	// telemetry providers
+	meterProvider  metric.MeterProvider
+	tracerProvider trace.TracerProvider
 }
 
 type concurrentOptions struct {

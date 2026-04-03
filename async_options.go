@@ -1,6 +1,11 @@
 package gofuncy
 
-import "log/slog"
+import (
+	"log/slog"
+
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/trace"
+)
 
 // AsyncOptions holds configuration for Async and AsyncBackground.
 type AsyncOptions struct {
@@ -89,6 +94,24 @@ func (b *AsyncOptionsBuilder) WithDurationMetric() *AsyncOptionsBuilder {
 func (b *AsyncOptionsBuilder) WithCounterMetric() *AsyncOptionsBuilder {
 	b.Opts = append(b.Opts, func(o *AsyncOptions) error {
 		o.counterMetric = true
+		return nil
+	})
+
+	return b
+}
+
+func (b *AsyncOptionsBuilder) WithMeterProvider(mp metric.MeterProvider) *AsyncOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *AsyncOptions) error {
+		o.meterProvider = mp
+		return nil
+	})
+
+	return b
+}
+
+func (b *AsyncOptionsBuilder) WithTracerProvider(tp trace.TracerProvider) *AsyncOptionsBuilder {
+	b.Opts = append(b.Opts, func(o *AsyncOptions) error {
+		o.tracerProvider = tp
 		return nil
 	})
 

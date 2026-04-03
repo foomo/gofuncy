@@ -3,19 +3,16 @@ package gofuncy
 import (
 	"context"
 	"errors"
-	"sync"
 
 	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/metric"
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
+	"go.opentelemetry.io/otel/trace"
 
 	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
 
-var (
-	meter  = otel.Meter("github.com/foomo/gofuncy", metric.WithSchemaURL(otelsemconv.SchemaURL))
-	tracer = otel.Tracer("github.com/foomo/gofuncy")
-)
+const ScopeName = "github.com/foomo/gofuncy"
 
 // instrumentation encapsulates all OTel metrics for goroutine operations.
 type instrumentation struct {
@@ -25,25 +22,46 @@ type instrumentation struct {
 	groupsDuration     gofuncyconv.GroupsDuration
 }
 
-var initInstrumentation = sync.OnceValues(func() (*instrumentation, error) {
+func resolveMeter(mp metric.MeterProvider) metric.Meter {
+	if mp == nil {
+		mp = otel.GetMeterProvider()
+	}
+
+	return mp.Meter(ScopeName, metric.WithSchemaURL(otelsemconv.SchemaURL))
+}
+
+func resolveTracer(tp trace.TracerProvider) trace.Tracer {
+	if tp == nil {
+		tp = otel.GetTracerProvider()
+	}
+
+	return tp.Tracer(ScopeName)
+}
+
+func resolveInstrumentation(mp metric.MeterProvider) *instrumentation {
 	inst := &instrumentation{}
+	m := resolveMeter(mp)
 
 	var err, e error
 
-	inst.goroutinesTotal, e = gofuncyconv.NewGoroutinesTotal(meter)
+	inst.goroutinesTotal, e = gofuncyconv.NewGoroutinesTotal(m)
 	err = errors.Join(err, e)
 
-	inst.goroutinesCurrent, e = gofuncyconv.NewGoroutinesCurrent(meter)
+	inst.goroutinesCurrent, e = gofuncyconv.NewGoroutinesCurrent(m)
 	err = errors.Join(err, e)
 
-	inst.goroutinesDuration, e = gofuncyconv.NewGoroutinesDuration(meter)
+	inst.goroutinesDuration, e = gofuncyconv.NewGoroutinesDuration(m)
 	err = errors.Join(err, e)
 
-	inst.groupsDuration, e = gofuncyconv.NewGroupsDuration(meter)
+	inst.groupsDuration, e = gofuncyconv.NewGroupsDuration(m)
 	err = errors.Join(err, e)
 
-	return inst, err
-})
+	if err != nil {
+		otel.Handle(err)
+	}
+
+	return inst
+}
 
 func (i *instrumentation) addGoroutine(ctx context.Context, routineName string) {
 	if i == nil {
@@ -85,30 +103,29 @@ func (i *instrumentation) recordGroupDuration(ctx context.Context, seconds float
 	i.groupsDuration.Record(ctx, seconds, routineName, hasError, groupSize)
 }
 
-// chan metrics — kept as sync.OnceValue for backward compatibility with chan.go
-var chansCurrentMetric = sync.OnceValue(func() gofuncyconv.ChansCurrent {
-	c, err := gofuncyconv.NewChansCurrent(meter)
+func resolveChansCurrent(mp metric.MeterProvider) gofuncyconv.ChansCurrent {
+	c, err := gofuncyconv.NewChansCurrent(resolveMeter(mp))
 	if err != nil {
 		otel.Handle(err)
 	}
 
 	return c
-})
+}
 
-var messagesCurrentMetric = sync.OnceValue(func() gofuncyconv.MessagesCurrent {
-	c, err := gofuncyconv.NewMessagesCurrent(meter)
+func resolveMessagesCurrent(mp metric.MeterProvider) gofuncyconv.MessagesCurrent {
+	c, err := gofuncyconv.NewMessagesCurrent(resolveMeter(mp))
 	if err != nil {
 		otel.Handle(err)
 	}
 
 	return c
-})
+}
 
-var messagesDurationMetric = sync.OnceValue(func() gofuncyconv.MessagesDuration {
-	h, err := gofuncyconv.NewMessagesDuration(meter)
+func resolveMessagesDuration(mp metric.MeterProvider) gofuncyconv.MessagesDuration {
+	h, err := gofuncyconv.NewMessagesDuration(resolveMeter(mp))
 	if err != nil {
 		otel.Handle(err)
 	}
 
 	return h
-})
+}

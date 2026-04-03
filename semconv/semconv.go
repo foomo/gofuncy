@@ -9,6 +9,7 @@ const (
 	ChanCapKey       = attribute.Key("gofuncy.chan.cap")
 	ChanSizeKey      = attribute.Key("gofuncy.chan.size")
 	GroupSizeKey     = attribute.Key("gofuncy.group.size")
+	ErrorKey         = attribute.Key("error")
 )
 
 func RoutineName(v string) attribute.KeyValue {
@@ -33,4 +34,8 @@ func ChanSize(v int) attribute.KeyValue {
 
 func GroupSize(v int) attribute.KeyValue {
 	return GroupSizeKey.Int(v)
+}
+
+func Error(v bool) attribute.KeyValue {
+	return ErrorKey.Bool(v)
 }

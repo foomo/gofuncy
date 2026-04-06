@@ -16,7 +16,7 @@ import (
 // Returns errors.Join of all failures, nil if all succeed.
 // Use GroupOption().WithFailFast() to cancel remaining on first error.
 // Use GroupOption().WithLimit(n) to bound concurrent goroutines.
-func Group(ctx context.Context, fns []Func, opts ...*GroupOptionsBuilder) error {
+func Group(ctx context.Context, fns []Func, opts ...Option[GroupOptions]) error {
 	if len(fns) == 0 {
 		return nil
 	}
@@ -30,7 +30,7 @@ func Group(ctx context.Context, fns []Func, opts ...*GroupOptionsBuilder) error 
 
 // GroupBackground is like Group but detaches from the parent context's cancellation.
 // The goroutines will continue running even if the parent context is canceled.
-func GroupBackground(ctx context.Context, fns []Func, opts ...*GroupOptionsBuilder) error {
+func GroupBackground(ctx context.Context, fns []Func, opts ...Option[GroupOptions]) error {
 	return Group(context.WithoutCancel(ctx), fns, opts...)
 }
 

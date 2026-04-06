@@ -46,7 +46,7 @@ func TestAsync_withName(t *testing.T) {
 			assert.Equal(t, expected, gofuncy.NameFromContext(ctx))
 			return nil
 		},
-		gofuncy.AsyncOption().WithName(expected),
+		gofuncy.WithName[gofuncy.AsyncOptions](expected),
 	)
 	assert.NoError(t, <-errChan)
 }
@@ -101,7 +101,7 @@ func TestAsync_withTracing(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.AsyncOption().WithTracing(),
+		gofuncy.WithTracing[gofuncy.AsyncOptions](),
 	)
 
 	require.NoError(t, <-errChan)
@@ -118,7 +118,7 @@ func TestAsync_withCounterMetric(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.AsyncOption().WithCounterMetric(),
+		gofuncy.WithCounterMetric[gofuncy.AsyncOptions](),
 	)
 
 	require.NoError(t, <-errChan)
@@ -135,7 +135,7 @@ func TestAsync_withUpDownMetric(t *testing.T) {
 			called.Store(true)
 			return nil
 		},
-		gofuncy.AsyncOption().WithUpDownMetric(),
+		gofuncy.WithUpDownMetric[gofuncy.AsyncOptions](),
 	)
 
 	require.NoError(t, <-errChan)
@@ -154,7 +154,7 @@ func TestAsync_withDurationMetric(t *testing.T) {
 
 			return nil
 		},
-		gofuncy.AsyncOption().WithDurationMetric(),
+		gofuncy.WithDurationMetric[gofuncy.AsyncOptions](),
 	)
 
 	require.NoError(t, <-errChan)
@@ -179,12 +179,12 @@ func TestAsync_contextNamePropagation(t *testing.T) {
 
 					return nil
 				},
-				gofuncy.AsyncOption().WithName("child-routine"),
+				gofuncy.WithName[gofuncy.AsyncOptions]("child-routine"),
 			)
 
 			return <-childErrChan
 		},
-		gofuncy.AsyncOption().WithName(parentName),
+		gofuncy.WithName[gofuncy.AsyncOptions](parentName),
 	)
 
 	err := <-errChan
@@ -214,7 +214,7 @@ func TestAsync_concurrent(t *testing.T) {
 				func(ctx context.Context) error {
 					return nil
 				},
-				gofuncy.AsyncOption().WithName(fmt.Sprintf("goroutine-%d", idx)),
+				gofuncy.WithName[gofuncy.AsyncOptions](fmt.Sprintf("goroutine-%d", idx)),
 			)
 
 			if err := <-errChan; err != nil {

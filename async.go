@@ -15,7 +15,7 @@ import (
 
 // Async spawns a single goroutine and returns its error channel.
 // The caller has explicit lifecycle control by reading from the returned channel.
-func Async(ctx context.Context, fn Func, opts ...*AsyncOptionsBuilder) <-chan error {
+func Async(ctx context.Context, fn Func, opts ...Option[AsyncOptions]) <-chan error {
 	o := newAsyncOptions(opts)
 
 	// create logger (only if provided, avoid allocation)
@@ -162,6 +162,6 @@ func Async(ctx context.Context, fn Func, opts ...*AsyncOptionsBuilder) <-chan er
 
 // AsyncBackground is like Async but detaches from the parent context's cancellation.
 // The goroutine will continue running even if the parent context is canceled.
-func AsyncBackground(ctx context.Context, fn Func, opts ...*AsyncOptionsBuilder) <-chan error {
+func AsyncBackground(ctx context.Context, fn Func, opts ...Option[AsyncOptions]) <-chan error {
 	return Async(context.WithoutCancel(ctx), fn, opts...)
 }

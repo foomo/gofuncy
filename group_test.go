@@ -101,7 +101,7 @@ func TestGroup_failFast(t *testing.T) {
 
 			return ctx.Err()
 		},
-	}, gofuncy.GroupOption().WithFailFast())
+	}, gofuncy.WithFailFast[gofuncy.GroupOptions]())
 
 	require.Error(t, err)
 	assert.ErrorIs(t, err, sentinel)
@@ -139,7 +139,7 @@ func TestGroup_withLimit(t *testing.T) {
 		}
 	}
 
-	err := gofuncy.Group(t.Context(), fns, gofuncy.GroupOption().WithLimit(limit))
+	err := gofuncy.Group(t.Context(), fns, gofuncy.WithLimit[gofuncy.GroupOptions](limit))
 	require.NoError(t, err)
 	assert.LessOrEqual(t, maxRunning.Load(), int32(limit))
 }

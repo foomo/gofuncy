@@ -90,17 +90,26 @@ test.bench.update:
 	@GO_TEST_TAGS=-skip go test -tags=safe -bench=. -benchmem -count=10 ./... > benchmark.txt
 	@echo "✅ benchmark.txt updated"
 
+.PHONY: generate
+## Run go generate
+generate:
+	@echo "〉go generate"
+	@go generate ./...
+
+### Dependencies
+
 .PHONY: outdated
 ## Show outdated direct dependencies
 outdated:
 	@echo "〉go mod outdated"
 	@go list -u -m -json all | go-mod-outdated -update -direct
 
-.PHONY: generate
-## Run go generate
-generate:
-	@echo "〉go generate"
-	@go generate ./...
+.PHONY: upgrade
+## Show outdated direct dependencies
+upgrade: go.work
+	@echo "〉go mod upgrade"
+	@go get -t -u all
+
 
 ### Documentation
 

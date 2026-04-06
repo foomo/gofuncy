@@ -3,10 +3,11 @@ package gofuncy_test
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"testing"
 	"time"
 
-	testingx "github.com/foomo/go/testing"
+	slogx "github.com/foomo/go/slog"
 	"github.com/foomo/gofuncy"
 	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
 	"github.com/foomo/opentelemetry-go/exporters/glossy/glossytrace"
@@ -16,24 +17,8 @@ import (
 	"go.uber.org/goleak"
 )
 
-type RunFunc func() int
-
-func M(m *testing.M, fn func(m *testing.M) RunFunc) RunFunc {
-	return fn(m)
-}
-
-func (r RunFunc) Run() int {
-
-	return r()
-}
-
 func TestMain(m *testing.M) {
-	_, flush := oteltesting.TestMainReportMetrics(m, glossymetric.NewTestMain(m))
-	goleak.VerifyTestMain(testingx.MFunc(func() int {
-		i := m.Run()
-		flush()
-		return i
-	}))
+	goleak.VerifyTestMain(m)
 }
 
 func ExampleGo() {
@@ -70,7 +55,10 @@ func TestGo_basic(t *testing.T) {
 }
 
 func TestGo_withTracing(t *testing.T) {
-	oteltesting.ReportTraces(t, glossytrace.NewTest(t))
+	t.Parallel()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
 	done := make(chan struct{})
 
@@ -79,7 +67,9 @@ func TestGo_withTracing(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.GoOption().WithTracing(),
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithTracing[gofuncy.GoOptions](),
+		gofuncy.WithTracerProvider[gofuncy.GoOptions](tp),
 	)
 
 	select {
@@ -91,8 +81,9 @@ func TestGo_withTracing(t *testing.T) {
 
 func TestGo_withCounterMetric(t *testing.T) {
 	t.Parallel()
-	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
-	// defer flush()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	done := make(chan struct{})
 
@@ -101,7 +92,9 @@ func TestGo_withCounterMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.GoOption().WithCounterMetric(),
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithCounterMetric[gofuncy.GoOptions](),
+		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 
 	select {
@@ -113,8 +106,9 @@ func TestGo_withCounterMetric(t *testing.T) {
 
 func TestGo_withUpDownMetric(t *testing.T) {
 	t.Parallel()
-	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
-	// defer flush()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	done := make(chan struct{})
 
@@ -123,7 +117,9 @@ func TestGo_withUpDownMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.GoOption().WithUpDownMetric(),
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithUpDownMetric[gofuncy.GoOptions](),
+		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 
 	select {
@@ -135,8 +131,9 @@ func TestGo_withUpDownMetric(t *testing.T) {
 
 func TestGo_withDurationMetric(t *testing.T) {
 	t.Parallel()
-	// _, flush := oteltesting.ReportMetrics(t, glossymetric.NewTesting(t))
-	// defer flush()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	done := make(chan struct{})
 
@@ -145,7 +142,9 @@ func TestGo_withDurationMetric(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.GoOption().WithDurationMetric(),
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithDurationMetric[gofuncy.GoOptions](),
+		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 
 	select {
@@ -162,7 +161,7 @@ func TestGo_errorHandler(t *testing.T) {
 		func(ctx context.Context) error {
 			return fmt.Errorf("test error")
 		},
-		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -182,7 +181,7 @@ func TestGo_panicRecovery(t *testing.T) {
 		func(ctx context.Context) error {
 			panic("fire and forget panic")
 		},
-		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -207,7 +206,7 @@ func TestGo_canceledContext(t *testing.T) {
 		func(ctx context.Context) error {
 			return nil
 		},
-		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -228,9 +227,9 @@ func TestGo_contextCanceled(t *testing.T) {
 	gofuncy.Go(ctx,
 		func(ctx context.Context) error {
 			cancel()
-			return nil
+			return ctx.Err()
 		},
-		gofuncy.GoOption().WithErrorHandler(func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)

@@ -9,7 +9,7 @@ import (
 // Returns results and errors.Join of all failures.
 // Use MapOption().WithFailFast() to cancel on first error.
 // Use MapOption().WithLimit(n) to bound concurrent goroutines.
-func Map[T, R any](ctx context.Context, input []T, fn func(ctx context.Context, v T) (R, error), opts ...*MapOptionsBuilder) ([]R, error) {
+func Map[T, R any](ctx context.Context, input []T, fn func(ctx context.Context, v T) (R, error), opts ...Option[MapOptions]) ([]R, error) {
 	if len(input) == 0 {
 		return nil, nil
 	}
@@ -40,6 +40,6 @@ func Map[T, R any](ctx context.Context, input []T, fn func(ctx context.Context, 
 
 // MapBackground is like Map but detaches from the parent context's cancellation.
 // The goroutines will continue running even if the parent context is canceled.
-func MapBackground[T, R any](ctx context.Context, input []T, fn func(ctx context.Context, v T) (R, error), opts ...*MapOptionsBuilder) ([]R, error) {
+func MapBackground[T, R any](ctx context.Context, input []T, fn func(ctx context.Context, v T) (R, error), opts ...Option[MapOptions]) ([]R, error) {
 	return Map(context.WithoutCancel(ctx), input, fn, opts...)
 }

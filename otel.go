@@ -54,8 +54,8 @@ func resolveInstrumentation(mp metric.MeterProvider) *instrumentation {
 	err = errors.Join(err, e)
 
 	inst.groupsDuration, e = gofuncyconv.NewGroupsDuration(m)
-	err = errors.Join(err, e)
 
+	err = errors.Join(err, e)
 	if err != nil {
 		otel.Handle(err)
 	}

@@ -48,7 +48,7 @@ func BenchmarkAsync_withName(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.AsyncOption().WithName("benchmark-routine"),
+			gofuncy.WithName[gofuncy.AsyncOptions]("benchmark-routine"),
 		)
 		<-errChan
 	}
@@ -60,7 +60,7 @@ func BenchmarkAsync_withTracing(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.AsyncOption().WithTracing(),
+			gofuncy.WithTracing[gofuncy.AsyncOptions](),
 		)
 		<-errChan
 	}
@@ -74,7 +74,7 @@ func BenchmarkAsync_withCounterMetric(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.AsyncOption().WithCounterMetric(),
+			gofuncy.WithCounterMetric[gofuncy.AsyncOptions](),
 		)
 		<-errChan
 	}
@@ -88,7 +88,7 @@ func BenchmarkAsync_withUpDownMetric(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.AsyncOption().WithUpDownMetric(),
+			gofuncy.WithUpDownMetric[gofuncy.AsyncOptions](),
 		)
 		<-errChan
 	}
@@ -102,7 +102,7 @@ func BenchmarkAsync_withDurationMetric(b *testing.B) {
 
 	for b.Loop() {
 		errChan := gofuncy.Async(ctx, gofunc,
-			gofuncy.AsyncOption().WithDurationMetric(),
+			gofuncy.WithDurationMetric[gofuncy.AsyncOptions](),
 		)
 		<-errChan
 	}

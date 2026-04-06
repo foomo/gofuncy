@@ -2,7 +2,6 @@ package gofuncy
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"runtime"
 	"time"
@@ -17,8 +16,8 @@ import (
 
 // Go spawns a fire-and-forget goroutine with panic recovery.
 // Errors are logged via slog by default; use GoOption().WithErrorHandler to override.
-func Go(ctx context.Context, fn Func, opts ...*OptionsBuilder) {
-	o := newOptions(opts)
+func Go(ctx context.Context, fn Func, opts ...Option[GoOptions]) {
+	o := newGoOptions(opts)
 
 	// capture error handler and logger before passing options to goroutine
 	errorHandler := o.errorHandler
@@ -55,10 +54,6 @@ func Go(ctx context.Context, fn Func, opts ...*OptionsBuilder) {
 		}
 
 		defer func(ctx context.Context) {
-			if ctx.Err() != nil {
-				err = errors.Join(err, ctx.Err())
-			}
-
 			if err == nil {
 				return
 			}

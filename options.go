@@ -19,6 +19,7 @@ type hasBaseOptions interface {
 // ~ Shared options (all operation types)
 // ------------------------------------------------------------------------------------------------
 
+// WithName sets a custom name for the routine and updates the corresponding GoOptions field.
 func WithName[T hasBaseOptions](name string) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -28,6 +29,7 @@ func WithName[T hasBaseOptions](name string) Option[T] {
 	}
 }
 
+// WithLogger configures the logger for the operation using the provided *slog.Logger.
 func WithLogger[T hasBaseOptions](l *slog.Logger) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -37,6 +39,7 @@ func WithLogger[T hasBaseOptions](l *slog.Logger) Option[T] {
 	}
 }
 
+// WithTracing enables tracing for the operation by setting the tracing flag in the GoOptions.
 func WithTracing[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -46,6 +49,7 @@ func WithTracing[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithStartedCounter enables the started counter for the operation by setting the startedCounter flag in the GoOptions.
 func WithStartedCounter[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -55,6 +59,7 @@ func WithStartedCounter[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithFinishedCounter enables the finished counter for the operation by setting the finishedCounter flag in the GoOptions.
 func WithFinishedCounter[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -64,6 +69,7 @@ func WithFinishedCounter[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithErrorCounter enables the error counter for the operation by setting the errorCounter flag in the GoOptions.
 func WithErrorCounter[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -73,6 +79,7 @@ func WithErrorCounter[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithActiveUpDownCounter enables the active up-down counter for the operation by setting the activeUpDownCounter flag in the GoOptions.
 func WithActiveUpDownCounter[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -82,6 +89,7 @@ func WithActiveUpDownCounter[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithDurationHistogram enables the duration histogram for the operation by setting the durationHistogram flag in the GoOptions.
 func WithDurationHistogram[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -91,6 +99,7 @@ func WithDurationHistogram[T hasBaseOptions]() Option[T] {
 	}
 }
 
+// WithDurationTimer enables the duration timer for the operation by setting the durationTimer flag in the GoOptions.
 func WithMiddleware[T hasBaseOptions](m ...Middleware) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -100,6 +109,7 @@ func WithMiddleware[T hasBaseOptions](m ...Middleware) Option[T] {
 	}
 }
 
+// WithMeterProvider enables the meter provider for the operation by setting the meterProvider field in the GoOptions.
 func WithMeterProvider[T hasBaseOptions](mp metric.MeterProvider) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -109,6 +119,7 @@ func WithMeterProvider[T hasBaseOptions](mp metric.MeterProvider) Option[T] {
 	}
 }
 
+// WithTracerProvider enables the tracer provider for the operation by setting the tracerProvider field in the GoOptions.
 func WithTracerProvider[T hasBaseOptions](tp trace.TracerProvider) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
@@ -122,6 +133,7 @@ func WithTracerProvider[T hasBaseOptions](tp trace.TracerProvider) Option[T] {
 // ~ Go-only options
 // ------------------------------------------------------------------------------------------------
 
+// WithTimeout enables the timeout for the operation by setting the timeout field in the GoOptions.
 func WithTimeout[T GoOptions](timeout time.Duration) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) { //nolint:gocritic // singleCaseSwitch
@@ -131,6 +143,7 @@ func WithTimeout[T GoOptions](timeout time.Duration) Option[T] {
 	}
 }
 
+// WithCallerSkip enables the caller skip for the operation by setting the callerSkip field in the GoOptions.
 func WithCallerSkip[T GoOptions](skip int) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) { //nolint:gocritic // singleCaseSwitch
@@ -140,6 +153,7 @@ func WithCallerSkip[T GoOptions](skip int) Option[T] {
 	}
 }
 
+// WithErrorHandler enables the error handler for the operation by setting the errorHandler field in the GoOptions.
 func WithErrorHandler[T GoOptions](h ErrorHandler) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) { //nolint:gocritic // singleCaseSwitch

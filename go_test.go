@@ -79,7 +79,7 @@ func TestGo_withTracing(t *testing.T) {
 	}
 }
 
-func TestGo_withCounterMetric(t *testing.T) {
+func TestGo_withStartedCounter(t *testing.T) {
 	t.Parallel()
 
 	l := slog.New(slogx.NewTestHandler(t))
@@ -93,7 +93,7 @@ func TestGo_withCounterMetric(t *testing.T) {
 			return nil
 		},
 		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithCounterMetric[gofuncy.GoOptions](),
+		gofuncy.WithStartedCounter[gofuncy.GoOptions](),
 		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 
@@ -104,7 +104,7 @@ func TestGo_withCounterMetric(t *testing.T) {
 	}
 }
 
-func TestGo_withUpDownMetric(t *testing.T) {
+func TestGo_withFinishedCounter(t *testing.T) {
 	t.Parallel()
 
 	l := slog.New(slogx.NewTestHandler(t))
@@ -118,7 +118,7 @@ func TestGo_withUpDownMetric(t *testing.T) {
 			return nil
 		},
 		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithUpDownMetric[gofuncy.GoOptions](),
+		gofuncy.WithFinishedCounter[gofuncy.GoOptions](),
 		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 
@@ -129,7 +129,35 @@ func TestGo_withUpDownMetric(t *testing.T) {
 	}
 }
 
-func TestGo_withDurationMetric(t *testing.T) {
+func TestGo_withErrorCounter(t *testing.T) {
+	t.Parallel()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
+
+	errCh := make(chan error, 1)
+
+	gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			return fmt.Errorf("metric error")
+		},
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithErrorCounter[gofuncy.GoOptions](),
+		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+			errCh <- err
+		}),
+	)
+
+	select {
+	case err := <-errCh:
+		require.EqualError(t, err, "metric error")
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for error")
+	}
+}
+
+func TestGo_withActiveUpDownCounter(t *testing.T) {
 	t.Parallel()
 
 	l := slog.New(slogx.NewTestHandler(t))
@@ -143,7 +171,32 @@ func TestGo_withDurationMetric(t *testing.T) {
 			return nil
 		},
 		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithDurationMetric[gofuncy.GoOptions](),
+		gofuncy.WithActiveUpDownCounter[gofuncy.GoOptions](),
+		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+	)
+
+	select {
+	case <-done:
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for Go to complete")
+	}
+}
+
+func TestGo_withDurationHistogram(t *testing.T) {
+	t.Parallel()
+
+	l := slog.New(slogx.NewTestHandler(t))
+	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
+
+	done := make(chan struct{})
+
+	gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			close(done)
+			return nil
+		},
+		gofuncy.WithLogger[gofuncy.GoOptions](l),
+		gofuncy.WithDurationHistogram[gofuncy.GoOptions](),
 		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
 	)
 

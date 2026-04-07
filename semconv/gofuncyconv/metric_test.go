@@ -11,25 +11,25 @@ import (
 	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
 
-func TestGoroutinesTotal(t *testing.T) {
+func TestGoroutinesStarted(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewGoroutinesTotal(noop.Meter{})
+	m, err := gofuncyconv.NewGoroutinesStarted(noop.Meter{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "gofuncy.goroutines.total", m.Name())
+	assert.Equal(t, "gofuncy.goroutines.started", m.Name())
 	assert.Equal(t, "{goroutine}", m.Unit())
-	assert.Equal(t, "Gofuncy running go routine count", m.Description())
+	assert.Equal(t, "Total number of goroutines started", m.Description())
 	assert.NotNil(t, m.Inst())
 
 	// must not panic
 	m.Add(context.Background(), 1, "test-routine")
 }
 
-func TestGoroutinesTotal_nilMeter(t *testing.T) {
+func TestGoroutinesStarted_nilMeter(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewGoroutinesTotal(nil)
+	m, err := gofuncyconv.NewGoroutinesStarted(nil)
 	require.NoError(t, err)
 
 	assert.Nil(t, m.Inst())
@@ -38,25 +38,75 @@ func TestGoroutinesTotal_nilMeter(t *testing.T) {
 	m.Add(context.Background(), 1, "test-routine")
 }
 
-func TestGoroutinesCurrent(t *testing.T) {
+func TestGoroutinesFinished(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewGoroutinesCurrent(noop.Meter{})
+	m, err := gofuncyconv.NewGoroutinesFinished(noop.Meter{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "gofuncy.goroutines.current", m.Name())
+	assert.Equal(t, "gofuncy.goroutines.finished", m.Name())
 	assert.Equal(t, "{goroutine}", m.Unit())
-	assert.Equal(t, "Gofuncy running go routine up/down count", m.Description())
+	assert.Equal(t, "Total number of goroutines finished", m.Description())
+	assert.NotNil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesFinished_nilMeter(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesFinished(nil)
+	require.NoError(t, err)
+
+	assert.Nil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesErrors(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesErrors(noop.Meter{})
+	require.NoError(t, err)
+
+	assert.Equal(t, "gofuncy.goroutines.errors", m.Name())
+	assert.Equal(t, "{goroutine}", m.Unit())
+	assert.Equal(t, "Total number of goroutine errors", m.Description())
+	assert.NotNil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesErrors_nilMeter(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesErrors(nil)
+	require.NoError(t, err)
+
+	assert.Nil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesActive(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesActive(noop.Meter{})
+	require.NoError(t, err)
+
+	assert.Equal(t, "gofuncy.goroutines.active", m.Name())
+	assert.Equal(t, "{goroutine}", m.Unit())
+	assert.Equal(t, "Number of currently active goroutines", m.Description())
 	assert.NotNil(t, m.Inst())
 
 	m.Add(context.Background(), 1, "test-routine")
 	m.Add(context.Background(), -1, "test-routine")
 }
 
-func TestGoroutinesCurrent_nilMeter(t *testing.T) {
+func TestGoroutinesActive_nilMeter(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewGoroutinesCurrent(nil)
+	m, err := gofuncyconv.NewGoroutinesActive(nil)
 	require.NoError(t, err)
 
 	m.Add(context.Background(), 1, "test-routine")
@@ -70,7 +120,7 @@ func TestGoroutinesDuration(t *testing.T) {
 
 	assert.Equal(t, "gofuncy.goroutines.duration.seconds", m.Name())
 	assert.Equal(t, "s", m.Unit())
-	assert.Equal(t, "Gofuncy go routine duration histogram", m.Description())
+	assert.Equal(t, "Duration of goroutine execution", m.Description())
 	assert.NotNil(t, m.Inst())
 
 	m.Record(context.Background(), 0.5, "test-routine", false)

@@ -12,7 +12,11 @@ import (
 type Option[T any] func(*T)
 
 type hasBaseOptions interface {
-	GoOptions
+	GoOptions | AsyncOptions | GroupOptions | MapOptions
+}
+
+type hasConcurrentOptions interface {
+	GroupOptions | MapOptions
 }
 
 // ------------------------------------------------------------------------------------------------
@@ -24,6 +28,12 @@ func WithName[T hasBaseOptions](name string) Option[T] {
 		switch x := any(o).(type) {
 		case *GoOptions:
 			x.name = name
+		case *AsyncOptions:
+			x.name = name
+		case *GroupOptions:
+			x.name = name
+		case *MapOptions:
+			x.name = name
 		}
 	}
 }
@@ -32,6 +42,12 @@ func WithLogger[T hasBaseOptions](l *slog.Logger) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
 		case *GoOptions:
+			x.l = l
+		case *AsyncOptions:
+			x.l = l
+		case *GroupOptions:
+			x.l = l
+		case *MapOptions:
 			x.l = l
 		}
 	}
@@ -42,60 +58,57 @@ func WithTracing[T hasBaseOptions]() Option[T] {
 		switch x := any(o).(type) {
 		case *GoOptions:
 			x.tracing = true
+		case *AsyncOptions:
+			x.tracing = true
+		case *GroupOptions:
+			x.tracing = true
+		case *MapOptions:
+			x.tracing = true
 		}
 	}
 }
 
-func WithStartedCounter[T hasBaseOptions]() Option[T] {
+func WithUpDownMetric[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
 		case *GoOptions:
-			x.startedCounter = true
+			x.upDownMetric = true
+		case *AsyncOptions:
+			x.upDownMetric = true
+		case *GroupOptions:
+			x.upDownMetric = true
+		case *MapOptions:
+			x.upDownMetric = true
 		}
 	}
 }
 
-func WithFinishedCounter[T hasBaseOptions]() Option[T] {
+func WithDurationMetric[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
 		case *GoOptions:
-			x.finishedCounter = true
+			x.durationMetric = true
+		case *AsyncOptions:
+			x.durationMetric = true
+		case *GroupOptions:
+			x.durationMetric = true
+		case *MapOptions:
+			x.durationMetric = true
 		}
 	}
 }
 
-func WithErrorCounter[T hasBaseOptions]() Option[T] {
+func WithCounterMetric[T hasBaseOptions]() Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
 		case *GoOptions:
-			x.errorCounter = true
-		}
-	}
-}
-
-func WithActiveUpDownCounter[T hasBaseOptions]() Option[T] {
-	return func(o *T) {
-		switch x := any(o).(type) {
-		case *GoOptions:
-			x.activeUpDownCounter = true
-		}
-	}
-}
-
-func WithDurationHistogram[T hasBaseOptions]() Option[T] {
-	return func(o *T) {
-		switch x := any(o).(type) {
-		case *GoOptions:
-			x.durationHistogram = true
-		}
-	}
-}
-
-func WithMiddleware[T hasBaseOptions](m ...Middleware) Option[T] {
-	return func(o *T) {
-		switch x := any(o).(type) {
-		case *GoOptions:
-			x.middlewares = append(x.middlewares, m...)
+			x.counterMetric = true
+		case *AsyncOptions:
+			x.counterMetric = true
+		case *GroupOptions:
+			x.counterMetric = true
+		case *MapOptions:
+			x.counterMetric = true
 		}
 	}
 }
@@ -105,6 +118,12 @@ func WithMeterProvider[T hasBaseOptions](mp metric.MeterProvider) Option[T] {
 		switch x := any(o).(type) {
 		case *GoOptions:
 			x.meterProvider = mp
+		case *AsyncOptions:
+			x.meterProvider = mp
+		case *GroupOptions:
+			x.meterProvider = mp
+		case *MapOptions:
+			x.meterProvider = mp
 		}
 	}
 }
@@ -113,6 +132,12 @@ func WithTracerProvider[T hasBaseOptions](tp trace.TracerProvider) Option[T] {
 	return func(o *T) {
 		switch x := any(o).(type) {
 		case *GoOptions:
+			x.tracerProvider = tp
+		case *AsyncOptions:
+			x.tracerProvider = tp
+		case *GroupOptions:
+			x.tracerProvider = tp
+		case *MapOptions:
 			x.tracerProvider = tp
 		}
 	}
@@ -145,6 +170,32 @@ func WithErrorHandler[T GoOptions](h ErrorHandler) Option[T] {
 		switch x := any(o).(type) { //nolint:gocritic // singleCaseSwitch
 		case *GoOptions:
 			x.errorHandler = h
+		}
+	}
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ Concurrent options (Group and Map)
+// ------------------------------------------------------------------------------------------------
+
+func WithLimit[T hasConcurrentOptions](n int) Option[T] {
+	return func(o *T) {
+		switch x := any(o).(type) {
+		case *GroupOptions:
+			x.limit = n
+		case *MapOptions:
+			x.limit = n
+		}
+	}
+}
+
+func WithFailFast[T hasConcurrentOptions]() Option[T] {
+	return func(o *T) {
+		switch x := any(o).(type) {
+		case *GroupOptions:
+			x.failFast = true
+		case *MapOptions:
+			x.failFast = true
 		}
 	}
 }

@@ -14,14 +14,20 @@ import (
 // ------------------------------------------------------------------------------------------------
 
 const (
-	goroutinesTotalName = "gofuncy.goroutines.total"
-	goroutinesTotalDesc = "Gofuncy running go routine count"
+	goroutinesStartedName = "gofuncy.goroutines.started"
+	goroutinesStartedDesc = "Total number of goroutines started"
 
-	goroutinesCurrentName = "gofuncy.goroutines.current"
-	goroutinesCurrentDesc = "Gofuncy running go routine up/down count"
+	goroutinesFinishedName = "gofuncy.goroutines.finished"
+	goroutinesFinishedDesc = "Total number of goroutines finished"
+
+	goroutinesErrorsName = "gofuncy.goroutines.errors"
+	goroutinesErrorsDesc = "Total number of goroutine errors"
+
+	goroutinesActiveName = "gofuncy.goroutines.active"
+	goroutinesActiveDesc = "Number of currently active goroutines"
 
 	goroutinesDurationName = "gofuncy.goroutines.duration.seconds"
-	goroutinesDurationDesc = "Gofuncy go routine duration histogram"
+	goroutinesDurationDesc = "Duration of goroutine execution"
 
 	groupsDurationName = "gofuncy.groups.duration.seconds"
 	groupsDurationDesc = "Gofuncy group/map duration histogram"
@@ -47,33 +53,33 @@ var durationBuckets = metric.WithExplicitBucketBoundaries(
 )
 
 // ------------------------------------------------------------------------------------------------
-// ~ GoroutinesTotal
+// ~ GoroutinesStarted
 // ------------------------------------------------------------------------------------------------
 
-// GoroutinesTotal counts the total number of goroutines spawned.
-type GoroutinesTotal struct {
+// GoroutinesStarted counts the total number of goroutines started.
+type GoroutinesStarted struct {
 	inst metric.Int64Counter
 }
 
-func NewGoroutinesTotal(m metric.Meter) (GoroutinesTotal, error) {
+func NewGoroutinesStarted(m metric.Meter) (GoroutinesStarted, error) {
 	if m == nil {
-		return GoroutinesTotal{}, nil
+		return GoroutinesStarted{}, nil
 	}
 
-	c, err := m.Int64Counter(goroutinesTotalName,
-		metric.WithDescription(goroutinesTotalDesc),
+	c, err := m.Int64Counter(goroutinesStartedName,
+		metric.WithDescription(goroutinesStartedDesc),
 		metric.WithUnit(unitGoroutine),
 	)
 
-	return GoroutinesTotal{inst: c}, err
+	return GoroutinesStarted{inst: c}, err
 }
 
-func (GoroutinesTotal) Name() string                { return goroutinesTotalName }
-func (GoroutinesTotal) Unit() string                { return unitGoroutine }
-func (GoroutinesTotal) Description() string         { return goroutinesTotalDesc }
-func (g GoroutinesTotal) Inst() metric.Int64Counter { return g.inst }
+func (GoroutinesStarted) Name() string                { return goroutinesStartedName }
+func (GoroutinesStarted) Unit() string                { return unitGoroutine }
+func (GoroutinesStarted) Description() string         { return goroutinesStartedDesc }
+func (g GoroutinesStarted) Inst() metric.Int64Counter { return g.inst }
 
-func (g GoroutinesTotal) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+func (g GoroutinesStarted) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
 	}
@@ -82,33 +88,103 @@ func (g GoroutinesTotal) Add(ctx context.Context, incr int64, routineName string
 }
 
 // ------------------------------------------------------------------------------------------------
-// ~ GoroutinesCurrent
+// ~ GoroutinesFinished
 // ------------------------------------------------------------------------------------------------
 
-// GoroutinesCurrent tracks the current number of active goroutines.
-type GoroutinesCurrent struct {
-	inst metric.Int64UpDownCounter
+// GoroutinesFinished counts the total number of goroutines finished.
+type GoroutinesFinished struct {
+	inst metric.Int64Counter
 }
 
-func NewGoroutinesCurrent(m metric.Meter) (GoroutinesCurrent, error) {
+func NewGoroutinesFinished(m metric.Meter) (GoroutinesFinished, error) {
 	if m == nil {
-		return GoroutinesCurrent{}, nil
+		return GoroutinesFinished{}, nil
 	}
 
-	c, err := m.Int64UpDownCounter(goroutinesCurrentName,
-		metric.WithDescription(goroutinesCurrentDesc),
+	c, err := m.Int64Counter(goroutinesFinishedName,
+		metric.WithDescription(goroutinesFinishedDesc),
 		metric.WithUnit(unitGoroutine),
 	)
 
-	return GoroutinesCurrent{inst: c}, err
+	return GoroutinesFinished{inst: c}, err
 }
 
-func (GoroutinesCurrent) Name() string                      { return goroutinesCurrentName }
-func (GoroutinesCurrent) Unit() string                      { return unitGoroutine }
-func (GoroutinesCurrent) Description() string               { return goroutinesCurrentDesc }
-func (g GoroutinesCurrent) Inst() metric.Int64UpDownCounter { return g.inst }
+func (GoroutinesFinished) Name() string                { return goroutinesFinishedName }
+func (GoroutinesFinished) Unit() string                { return unitGoroutine }
+func (GoroutinesFinished) Description() string         { return goroutinesFinishedDesc }
+func (g GoroutinesFinished) Inst() metric.Int64Counter { return g.inst }
 
-func (g GoroutinesCurrent) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+func (g GoroutinesFinished) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+	if g.inst == nil {
+		return
+	}
+
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ GoroutinesErrors
+// ------------------------------------------------------------------------------------------------
+
+// GoroutinesErrors counts the total number of goroutine errors.
+type GoroutinesErrors struct {
+	inst metric.Int64Counter
+}
+
+func NewGoroutinesErrors(m metric.Meter) (GoroutinesErrors, error) {
+	if m == nil {
+		return GoroutinesErrors{}, nil
+	}
+
+	c, err := m.Int64Counter(goroutinesErrorsName,
+		metric.WithDescription(goroutinesErrorsDesc),
+		metric.WithUnit(unitGoroutine),
+	)
+
+	return GoroutinesErrors{inst: c}, err
+}
+
+func (GoroutinesErrors) Name() string                { return goroutinesErrorsName }
+func (GoroutinesErrors) Unit() string                { return unitGoroutine }
+func (GoroutinesErrors) Description() string         { return goroutinesErrorsDesc }
+func (g GoroutinesErrors) Inst() metric.Int64Counter { return g.inst }
+
+func (g GoroutinesErrors) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+	if g.inst == nil {
+		return
+	}
+
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ GoroutinesActive
+// ------------------------------------------------------------------------------------------------
+
+// GoroutinesActive tracks the number of currently active goroutines.
+type GoroutinesActive struct {
+	inst metric.Int64UpDownCounter
+}
+
+func NewGoroutinesActive(m metric.Meter) (GoroutinesActive, error) {
+	if m == nil {
+		return GoroutinesActive{}, nil
+	}
+
+	c, err := m.Int64UpDownCounter(goroutinesActiveName,
+		metric.WithDescription(goroutinesActiveDesc),
+		metric.WithUnit(unitGoroutine),
+	)
+
+	return GoroutinesActive{inst: c}, err
+}
+
+func (GoroutinesActive) Name() string                      { return goroutinesActiveName }
+func (GoroutinesActive) Unit() string                      { return unitGoroutine }
+func (GoroutinesActive) Description() string               { return goroutinesActiveDesc }
+func (g GoroutinesActive) Inst() metric.Int64UpDownCounter { return g.inst }
+
+func (g GoroutinesActive) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
 	}
@@ -120,7 +196,7 @@ func (g GoroutinesCurrent) Add(ctx context.Context, incr int64, routineName stri
 // ~ GoroutinesDuration
 // ------------------------------------------------------------------------------------------------
 
-// GoroutinesDuration records the duration of individual goroutines.
+// GoroutinesDuration records the duration of goroutine execution.
 type GoroutinesDuration struct {
 	inst metric.Float64Histogram
 }

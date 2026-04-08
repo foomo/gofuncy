@@ -1,4 +1,4 @@
-package gofuncy
+package gofuncy //nolint:testpackage
 
 import (
 	"bytes"
@@ -25,6 +25,7 @@ func TestWithContextInjection_nameOnly(t *testing.T) {
 	fn := withContextInjection(func(ctx context.Context) error {
 		assert.Equal(t, "child", NameFromContext(ctx))
 		assert.Empty(t, ParentFromContext(ctx))
+
 		return nil
 	}, "child")
 
@@ -52,6 +53,7 @@ func TestWithContextInjection_nameAndParent(t *testing.T) {
 	fn := withContextInjection(func(ctx context.Context) error {
 		assert.Equal(t, "child", NameFromContext(ctx))
 		assert.Equal(t, "parent", ParentFromContext(ctx))
+
 		return nil
 	}, "child")
 
@@ -254,7 +256,9 @@ func TestWithDurationHistogram(t *testing.T) {
 	called := false
 	fn := withDurationHistogram(func(ctx context.Context) error {
 		time.Sleep(time.Millisecond)
+
 		called = true
+
 		return nil
 	}, metricnoop.Meter{}, "test")
 
@@ -282,18 +286,16 @@ func TestWithTracing_noError(t *testing.T) {
 
 	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
-	o := GoOptions{
-		baseOptions: baseOptions{
-			name:           "test-routine",
-			tracerProvider: tp,
-		},
+	o := options{
+		name:           "test-routine",
+		tracerProvider: tp,
 	}
 
 	called := false
 	fn := withTracing(func(ctx context.Context) error {
 		called = true
 		return nil
-	}, &o, 1)
+	}, &o, "gofuncy.go", 1)
 
 	require.NoError(t, fn(context.Background()))
 	assert.True(t, called)
@@ -304,16 +306,14 @@ func TestWithTracing_withError(t *testing.T) {
 
 	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
-	o := GoOptions{
-		baseOptions: baseOptions{
-			name:           "test-routine",
-			tracerProvider: tp,
-		},
+	o := options{
+		name:           "test-routine",
+		tracerProvider: tp,
 	}
 
 	fn := withTracing(func(ctx context.Context) error {
 		return fmt.Errorf("traced error")
-	}, &o, 1)
+	}, &o, "gofuncy.go", 1)
 
 	require.EqualError(t, fn(context.Background()), "traced error")
 }
@@ -331,7 +331,9 @@ func TestWithMiddleware_single(t *testing.T) {
 		return func(ctx context.Context) error {
 			order = append(order, "before")
 			err := fn(ctx)
+
 			order = append(order, "after")
+
 			return err
 		}
 	})
@@ -401,6 +403,7 @@ func TestHandleError_customHandler(t *testing.T) {
 	t.Parallel()
 
 	var got error
+
 	handler := ErrorHandler(func(ctx context.Context, err error) {
 		got = err
 	})
@@ -413,6 +416,7 @@ func TestHandleError_withLogger(t *testing.T) {
 	t.Parallel()
 
 	var buf bytes.Buffer
+
 	l := slog.New(slog.NewTextHandler(&buf, nil))
 
 	handleError(context.Background(), fmt.Errorf("logged"), nil, l, "test")

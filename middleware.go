@@ -45,7 +45,7 @@ func withTimeout(fn Func, timeout time.Duration) Func {
 }
 
 func withRecover(fn Func) Func {
-	return func(ctx context.Context) (err error) {
+	return func(ctx context.Context) (err error) { //nolint:nonamedreturns
 		defer recoverError(&err)
 		return fn(ctx)
 	}
@@ -66,6 +66,7 @@ func withFinishedCounter(fn Func, m metric.Meter, name string) Func {
 	return func(ctx context.Context) error {
 		err := fn(ctx)
 		finished.Add(ctx, 1, name)
+
 		return err
 	}
 }
@@ -78,6 +79,7 @@ func withErrorCounter(fn Func, m metric.Meter, name string) Func {
 		if err != nil {
 			errors.Add(ctx, 1, name)
 		}
+
 		return err
 	}
 }
@@ -87,7 +89,9 @@ func withActiveUpDownCounter(fn Func, m metric.Meter, name string) Func {
 
 	return func(ctx context.Context) error {
 		active.Add(ctx, 1, name)
+
 		defer func() { active.Add(ctx, -1, name) }()
+
 		return fn(ctx)
 	}
 }
@@ -100,11 +104,12 @@ func withDurationHistogram(fn Func, m metric.Meter, name string) Func {
 		err := fn(ctx)
 		dur := time.Since(start).Truncate(time.Millisecond).Seconds()
 		duration.Record(context.WithoutCancel(ctx), dur, name, err != nil)
+
 		return err
 	}
 }
 
-func withTracing(fn Func, o *GoOptions, callerSkip int) Func {
+func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 	var traceAttrsBuf [4]attribute.KeyValue
 
 	traceAttrs := traceAttrsBuf[:0]
@@ -124,12 +129,11 @@ func withTracing(fn Func, o *GoOptions, callerSkip int) Func {
 		}
 
 		ctx, span := o.tracer().Start(ctx,
-			"gofuncy.go "+o.name,
+			spanPrefix+" "+o.name,
 			trace.WithAttributes(traceAttrs...),
 		)
 
 		err := fn(ctx)
-
 		if err != nil {
 			span.RecordError(err)
 			span.SetStatus(codes.Error, err.Error())

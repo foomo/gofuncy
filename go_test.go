@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -15,6 +17,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"go.uber.org/goleak"
+	"golang.org/x/sync/semaphore"
 )
 
 func TestMain(m *testing.M) {
@@ -67,9 +70,9 @@ func TestGo_withTracing(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithTracing[gofuncy.GoOptions](),
-		gofuncy.WithTracerProvider[gofuncy.GoOptions](tp),
+		gofuncy.WithLogger(l),
+		gofuncy.WithTracing(),
+		gofuncy.WithTracerProvider(tp),
 	)
 
 	select {
@@ -92,9 +95,9 @@ func TestGo_withStartedCounter(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithStartedCounter[gofuncy.GoOptions](),
-		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+		gofuncy.WithLogger(l),
+		gofuncy.WithStartedCounter(),
+		gofuncy.WithMeterProvider(mp),
 	)
 
 	select {
@@ -117,9 +120,9 @@ func TestGo_withFinishedCounter(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithFinishedCounter[gofuncy.GoOptions](),
-		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+		gofuncy.WithLogger(l),
+		gofuncy.WithFinishedCounter(),
+		gofuncy.WithMeterProvider(mp),
 	)
 
 	select {
@@ -141,10 +144,10 @@ func TestGo_withErrorCounter(t *testing.T) {
 		func(ctx context.Context) error {
 			return fmt.Errorf("metric error")
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithErrorCounter[gofuncy.GoOptions](),
-		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
-		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+		gofuncy.WithLogger(l),
+		gofuncy.WithErrorCounter(),
+		gofuncy.WithMeterProvider(mp),
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -170,9 +173,9 @@ func TestGo_withActiveUpDownCounter(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithActiveUpDownCounter[gofuncy.GoOptions](),
-		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+		gofuncy.WithLogger(l),
+		gofuncy.WithActiveUpDownCounter(),
+		gofuncy.WithMeterProvider(mp),
 	)
 
 	select {
@@ -195,9 +198,9 @@ func TestGo_withDurationHistogram(t *testing.T) {
 			close(done)
 			return nil
 		},
-		gofuncy.WithLogger[gofuncy.GoOptions](l),
-		gofuncy.WithDurationHistogram[gofuncy.GoOptions](),
-		gofuncy.WithMeterProvider[gofuncy.GoOptions](mp),
+		gofuncy.WithLogger(l),
+		gofuncy.WithDurationHistogram(),
+		gofuncy.WithMeterProvider(mp),
 	)
 
 	select {
@@ -214,7 +217,7 @@ func TestGo_errorHandler(t *testing.T) {
 		func(ctx context.Context) error {
 			return fmt.Errorf("test error")
 		},
-		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -234,7 +237,7 @@ func TestGo_panicRecovery(t *testing.T) {
 		func(ctx context.Context) error {
 			panic("fire and forget panic")
 		},
-		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -259,7 +262,7 @@ func TestGo_canceledContext(t *testing.T) {
 		func(ctx context.Context) error {
 			return nil
 		},
-		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -282,7 +285,7 @@ func TestGo_contextCanceled(t *testing.T) {
 			cancel()
 			return ctx.Err()
 		},
-		gofuncy.WithErrorHandler[gofuncy.GoOptions](func(ctx context.Context, err error) {
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
 		}),
 	)
@@ -293,4 +296,49 @@ func TestGo_contextCanceled(t *testing.T) {
 	case <-time.After(time.Second):
 		t.Fatal("timed out waiting for context error")
 	}
+}
+
+func TestGo_withLimiter(t *testing.T) {
+	t.Parallel()
+
+	const (
+		limit = 2
+		total = 8
+	)
+
+	var (
+		active  atomic.Int32
+		maxSeen atomic.Int32
+		wg      sync.WaitGroup
+	)
+
+	sem := semaphore.NewWeighted(int64(limit))
+
+	wg.Add(total)
+
+	for range total {
+		gofuncy.Go(t.Context(),
+			func(ctx context.Context) error {
+				defer wg.Done()
+
+				cur := active.Add(1)
+
+				for {
+					old := maxSeen.Load()
+					if cur <= old || maxSeen.CompareAndSwap(old, cur) {
+						break
+					}
+				}
+
+				time.Sleep(10 * time.Millisecond)
+				active.Add(-1)
+
+				return nil
+			},
+			gofuncy.WithLimiter(sem),
+		)
+	}
+
+	wg.Wait()
+	assert.LessOrEqual(t, maxSeen.Load(), int32(limit))
 }

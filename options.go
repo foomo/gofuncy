@@ -93,10 +93,6 @@ func (o options) tracer() trace.Tracer {
 // Booleans are OR'd, slices are appended, pointers/interfaces use override if non-zero.
 // Group-specific fields (limit, failFast) are not merged.
 func (o options) merge(override options) options {
-	if override.name != "" && override.name != NameNoName {
-		o.name = override.name
-	}
-
 	if override.l != nil {
 		o.l = override.l
 	}
@@ -147,7 +143,6 @@ func (o options) merge(override options) options {
 
 func newGoOptions(opts []GoOption) options {
 	o := options{
-		name:                NameNoName,
 		tracing:             true,
 		startedCounter:      true,
 		errorCounter:        true,
@@ -165,7 +160,6 @@ func newGoOptions(opts []GoOption) options {
 
 func newGroupOptions(opts []GroupOption) options {
 	o := options{
-		name:                NameNoName,
 		tracing:             true,
 		startedCounter:      true,
 		errorCounter:        true,
@@ -197,13 +191,6 @@ func newGoOverrideOptions(opts []GoOption) options {
 // ------------------------------------------------------------------------------------------------
 // ~ Shared options (Go, NewGroup, Add)
 // ------------------------------------------------------------------------------------------------
-
-// WithName sets a custom name for the routine.
-func WithName(name string) baseOpt {
-	return func(o *options) {
-		o.name = name
-	}
-}
 
 // WithLogger configures the logger for the operation.
 func WithLogger(l *slog.Logger) baseOpt {

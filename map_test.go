@@ -17,7 +17,7 @@ func TestMap_basic(t *testing.T) {
 
 	items := []int{1, 2, 3, 4, 5}
 
-	results, err := gofuncy.Map(t.Context(), items, func(ctx context.Context, item int) (int, error) {
+	results, err := gofuncy.Map(t.Context(), "double", items, func(ctx context.Context, item int) (int, error) {
 		return item * 2, nil
 	})
 
@@ -30,7 +30,7 @@ func TestMap_preservesOrder(t *testing.T) {
 
 	items := []int{5, 4, 3, 2, 1}
 
-	results, err := gofuncy.Map(t.Context(), items, func(ctx context.Context, item int) (string, error) {
+	results, err := gofuncy.Map(t.Context(), "format", items, func(ctx context.Context, item int) (string, error) {
 		// sleep proportional to item to scramble completion order
 		time.Sleep(time.Duration(item) * time.Millisecond)
 
@@ -44,7 +44,7 @@ func TestMap_preservesOrder(t *testing.T) {
 func TestMap_empty(t *testing.T) {
 	t.Parallel()
 
-	results, err := gofuncy.Map(t.Context(), []int{}, func(ctx context.Context, item int) (int, error) {
+	results, err := gofuncy.Map(t.Context(), "empty", []int{}, func(ctx context.Context, item int) (int, error) {
 		t.Fatal("should not be called")
 		return 0, nil
 	})
@@ -58,7 +58,7 @@ func TestMap_errors(t *testing.T) {
 
 	items := []int{1, 2, 3}
 
-	results, err := gofuncy.Map(t.Context(), items, func(ctx context.Context, item int) (int, error) {
+	results, err := gofuncy.Map(t.Context(), "with-errors", items, func(ctx context.Context, item int) (int, error) {
 		if item == 2 {
 			return 0, fmt.Errorf("bad item")
 		}
@@ -77,7 +77,7 @@ func TestMap_failFast(t *testing.T) {
 
 	started := make(chan struct{})
 
-	_, err := gofuncy.Map(t.Context(), []int{1, 2},
+	_, err := gofuncy.Map(t.Context(), "fail-fast", []int{1, 2},
 		func(ctx context.Context, item int) (int, error) {
 			if item == 1 {
 				close(started)
@@ -112,7 +112,7 @@ func TestMap_withLimit(t *testing.T) {
 		items[i] = i
 	}
 
-	results, err := gofuncy.Map(t.Context(), items,
+	results, err := gofuncy.Map(t.Context(), "with-limit", items,
 		func(ctx context.Context, item int) (int, error) {
 			cur := active.Add(1)
 
@@ -142,7 +142,7 @@ func TestMap_withLimit(t *testing.T) {
 func TestMap_singleItem(t *testing.T) {
 	t.Parallel()
 
-	results, err := gofuncy.Map(t.Context(), []int{7}, func(ctx context.Context, item int) (string, error) {
+	results, err := gofuncy.Map(t.Context(), "single", []int{7}, func(ctx context.Context, item int) (string, error) {
 		return fmt.Sprintf("x%d", item), nil
 	})
 
@@ -156,7 +156,7 @@ func TestMap_partialErrorsPreserveResults(t *testing.T) {
 
 	items := []int{0, 1, 2, 3, 4}
 
-	results, err := gofuncy.Map(t.Context(), items, func(ctx context.Context, item int) (int, error) {
+	results, err := gofuncy.Map(t.Context(), "partial-errors", items, func(ctx context.Context, item int) (int, error) {
 		if item == 1 || item == 3 {
 			return 0, fmt.Errorf("bad item %d", item)
 		}
@@ -176,7 +176,7 @@ func TestMap_partialErrorsPreserveResults(t *testing.T) {
 func TestMap_panic(t *testing.T) {
 	t.Parallel()
 
-	results, err := gofuncy.Map(t.Context(), []int{1, 2, 3}, func(ctx context.Context, item int) (int, error) {
+	results, err := gofuncy.Map(t.Context(), "panic", []int{1, 2, 3}, func(ctx context.Context, item int) (int, error) {
 		if item == 2 {
 			panic("map panic")
 		}

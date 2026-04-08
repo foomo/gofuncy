@@ -35,9 +35,9 @@ func TestContext_nestedGoRoutines(t *testing.T) {
 	ch := make(chan result, 1)
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "parent",
 		func(ctx context.Context) error {
-			gofuncy.Go(ctx,
+			gofuncy.Go(ctx, "child",
 				func(ctx context.Context) error {
 					ch <- result{
 						name:   gofuncy.NameFromContext(ctx),
@@ -48,14 +48,12 @@ func TestContext_nestedGoRoutines(t *testing.T) {
 
 					return nil
 				},
-				gofuncy.WithName("child"),
 			)
 
 			<-done
 
 			return nil
 		},
-		gofuncy.WithName("parent"),
 	)
 
 	select {
@@ -76,7 +74,7 @@ func TestContext_existingDeadlineShorterThanTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "deadline-test",
 		func(ctx context.Context) error {
 			<-ctx.Done()
 			return ctx.Err()

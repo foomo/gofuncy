@@ -31,8 +31,9 @@ type Group struct {
 }
 
 // NewGroup creates a new Group with the given context and options.
-func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
+func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 	o := newGroupOptions(opts)
+	o.name = name
 
 	g := &Group{
 		ctx: ctx,
@@ -61,11 +62,12 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 // Add spawns a goroutine to execute fn immediately.
 // Per-function opts are merged on top of the group options (additive).
 // User middlewares and panic recovery are applied per fn.
-func (g *Group) Add(fn Func, opts ...GoOption) {
+func (g *Group) Add(name string, fn Func, opts ...GoOption) {
 	o := g.o
 	if len(opts) > 0 {
 		o = o.merge(newGoOverrideOptions(opts))
 	}
+	o.name = name
 
 	// build middleware chain (innermost → outermost)
 	run := fn

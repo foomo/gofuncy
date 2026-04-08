@@ -6,8 +6,9 @@ import (
 
 // Go spawns a fire-and-forget goroutine with panic recovery.
 // Errors are logged via slog by default; use WithErrorHandler to override.
-func Go(ctx context.Context, fn Func, opts ...GoOption) {
+func Go(ctx context.Context, name string, fn Func, opts ...GoOption) {
 	o := newGoOptions(opts)
+	o.name = name
 
 	// build middleware chain (innermost → outermost)
 	run := fn

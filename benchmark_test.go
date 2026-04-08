@@ -38,7 +38,7 @@ func BenchmarkGo_Default(b *testing.B) {
 	for b.Loop() {
 		done := make(chan struct{})
 
-		gofuncy.Go(b.Context(),
+		gofuncy.Go(b.Context(), "bench-default",
 			func(ctx context.Context) error {
 				time.Sleep(time.Millisecond)
 				close(done)
@@ -57,7 +57,7 @@ func BenchmarkGo_Minimal(b *testing.B) {
 	for b.Loop() {
 		done := make(chan struct{})
 
-		gofuncy.Go(b.Context(),
+		gofuncy.Go(b.Context(), "bench-minimal",
 			func(ctx context.Context) error {
 				time.Sleep(time.Millisecond)
 				close(done)
@@ -82,7 +82,7 @@ func BenchmarkGo_WithLimiter(b *testing.B) {
 	for b.Loop() {
 		done := make(chan struct{})
 
-		gofuncy.Go(b.Context(),
+		gofuncy.Go(b.Context(), "bench-limiter",
 			func(ctx context.Context) error {
 				time.Sleep(time.Millisecond)
 				close(done)
@@ -129,10 +129,10 @@ func BenchmarkGroup(b *testing.B) {
 			b.ReportAllocs()
 
 			for b.Loop() {
-				g := gofuncy.NewGroup(b.Context(), noTelemetry...)
+				g := gofuncy.NewGroup(b.Context(), "bench-group", noTelemetry...)
 
 				for range size {
-					g.Add(func(ctx context.Context) error {
+					g.Add("task", func(ctx context.Context) error {
 						return nil
 					})
 				}
@@ -147,13 +147,12 @@ func BenchmarkGroup_WithTelemetry(b *testing.B) {
 	b.ReportAllocs()
 
 	for b.Loop() {
-		g := gofuncy.NewGroup(b.Context(),
-			gofuncy.WithName("bench-group"),
+		g := gofuncy.NewGroup(b.Context(), "bench-group",
 			gofuncy.WithDurationHistogram(),
 		)
 
 		for range 100 {
-			g.Add(func(ctx context.Context) error {
+			g.Add("task", func(ctx context.Context) error {
 				return nil
 			})
 		}
@@ -179,7 +178,7 @@ func BenchmarkMap(b *testing.B) {
 		b.ReportAllocs()
 
 		for b.Loop() {
-			_, _ = gofuncy.Map(b.Context(), items, func(ctx context.Context, item int) (int, error) {
+			_, _ = gofuncy.Map(b.Context(), "bench-map", items, func(ctx context.Context, item int) (int, error) {
 				return item * 2, nil
 			}, noTelemetry...)
 		}

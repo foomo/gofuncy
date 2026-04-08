@@ -3,7 +3,7 @@ import { defineConfig } from 'vitepress'
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
 	title: 'gofuncy',
-	description: 'Stop using `go func`, start using `gofuncy`',
+	description: 'Structured concurrency primitives for Go',
 	lang: "en-US",
 	lastUpdated: true,
 	appearance: "force-dark",
@@ -17,17 +17,35 @@ export default defineConfig({
 		logo: '/logo.png',
 		outline: [2, 4],
 		nav: [
-			{ text: 'About', link: '/' },
-			{ text: 'API Reference', link: '/api/' },
+			{ text: 'Guide', link: '/guide/introduction' },
+			{ text: 'API Reference', link: '/api/go' },
+			{ text: 'Examples', link: '/examples/basic' },
 		],
 		sidebar: [
-			{ text: 'About', link: '/' },
-			{ text: 'Telemetry', link: '/telemetry' },
+			{
+				text: 'Guide',
+				items: [
+					{ text: 'Introduction', link: '/guide/introduction' },
+					{ text: 'Getting Started', link: '/guide/getting-started' },
+					{ text: 'Core Concepts', link: '/guide/concepts' },
+				],
+			},
 			{
 				text: 'API Reference',
 				items: [
-					{ text: 'Go', link: '/go' },
-					{ text: 'GoBackground', link: '/gobackground' },
+					{ text: 'Go', link: '/api/go' },
+					{ text: 'Group', link: '/api/group' },
+					{ text: 'ForEach', link: '/api/foreach' },
+					{ text: 'Map', link: '/api/map' },
+					{ text: 'Options', link: '/api/options' },
+				],
+			},
+			{
+				text: 'Examples',
+				items: [
+					{ text: 'Basic', link: '/examples/basic' },
+					{ text: 'Advanced', link: '/examples/advanced' },
+					{ text: 'Patterns', link: '/examples/patterns' },
 				],
 			},
 			{
@@ -86,7 +104,7 @@ export default defineConfig({
 			'meta',
 			{
 				property: 'og:description',
-				content: 'Stop using `go func`, start using `gofuncy`',
+				content: 'Structured concurrency primitives for Go',
 			},
 		],
 		['meta', { name: 'twitter:card', content: 'summary_large_image' }],

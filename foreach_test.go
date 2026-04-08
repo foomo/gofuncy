@@ -20,7 +20,7 @@ func TestForEach_basic(t *testing.T) {
 
 	items := []int{1, 2, 3, 4, 5}
 
-	err := gofuncy.ForEach(t.Context(), items, func(ctx context.Context, item int) error {
+	err := gofuncy.ForEach(t.Context(), "basic", items, func(ctx context.Context, item int) error {
 		count.Add(1)
 		return nil
 	})
@@ -32,7 +32,7 @@ func TestForEach_basic(t *testing.T) {
 func TestForEach_empty(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.ForEach(t.Context(), []int{}, func(ctx context.Context, item int) error {
+	err := gofuncy.ForEach(t.Context(), "empty", []int{}, func(ctx context.Context, item int) error {
 		t.Fatal("should not be called")
 		return nil
 	})
@@ -48,7 +48,7 @@ func TestForEach_errors(t *testing.T) {
 
 	items := []int{1, 2, 3}
 
-	err := gofuncy.ForEach(t.Context(), items, func(ctx context.Context, item int) error {
+	err := gofuncy.ForEach(t.Context(), "with-errors", items, func(ctx context.Context, item int) error {
 		switch item {
 		case 1:
 			return errA
@@ -69,7 +69,7 @@ func TestForEach_failFast(t *testing.T) {
 
 	started := make(chan struct{})
 
-	err := gofuncy.ForEach(t.Context(), []int{1, 2},
+	err := gofuncy.ForEach(t.Context(), "fail-fast", []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)
@@ -103,7 +103,7 @@ func TestForEach_withLimit(t *testing.T) {
 		items[i] = i
 	}
 
-	err := gofuncy.ForEach(t.Context(), items,
+	err := gofuncy.ForEach(t.Context(), "with-limit", items,
 		func(ctx context.Context, item int) error {
 			cur := active.Add(1)
 
@@ -131,7 +131,7 @@ func TestForEach_singleItem(t *testing.T) {
 
 	var got int
 
-	err := gofuncy.ForEach(t.Context(), []int{42}, func(ctx context.Context, item int) error {
+	err := gofuncy.ForEach(t.Context(), "single", []int{42}, func(ctx context.Context, item int) error {
 		got = item
 		return nil
 	})
@@ -143,7 +143,7 @@ func TestForEach_singleItem(t *testing.T) {
 func TestForEach_panic(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.ForEach(t.Context(), []int{1}, func(ctx context.Context, item int) error {
+	err := gofuncy.ForEach(t.Context(), "panic", []int{1}, func(ctx context.Context, item int) error {
 		panic("foreach panic")
 	})
 
@@ -162,7 +162,7 @@ func TestForEach_contextCancel(t *testing.T) {
 
 	started := make(chan struct{})
 
-	err := gofuncy.ForEach(ctx, []int{1, 2},
+	err := gofuncy.ForEach(ctx, "ctx-cancel", []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)

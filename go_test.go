@@ -26,7 +26,7 @@ func TestMain(m *testing.M) {
 func ExampleGo() {
 	done := make(chan struct{})
 
-	gofuncy.Go(context.Background(), func(ctx context.Context) error {
+	gofuncy.Go(context.Background(), "example", func(ctx context.Context) error {
 		defer close(done)
 
 		fmt.Println("running")
@@ -42,7 +42,7 @@ func ExampleGo() {
 func TestGo_basic(t *testing.T) {
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "basic",
 		func(ctx context.Context) error {
 			close(done)
 			return nil
@@ -64,7 +64,7 @@ func TestGo_withDurationHistogram(t *testing.T) {
 
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "duration-histogram",
 		func(ctx context.Context) error {
 			close(done)
 			return nil
@@ -87,7 +87,7 @@ func TestGo_withStallThreshold(t *testing.T) {
 	stallCh := make(chan struct{}, 1)
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "stall-test",
 		func(ctx context.Context) error {
 			<-stallCh
 			close(done)
@@ -110,7 +110,7 @@ func TestGo_withStallThreshold(t *testing.T) {
 func TestGo_errorHandler(t *testing.T) {
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "error-handler",
 		func(ctx context.Context) error {
 			return fmt.Errorf("test error")
 		},
@@ -130,7 +130,7 @@ func TestGo_errorHandler(t *testing.T) {
 func TestGo_panicRecovery(t *testing.T) {
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "panic-recovery",
 		func(ctx context.Context) error {
 			panic("fire and forget panic")
 		},
@@ -155,7 +155,7 @@ func TestGo_canceledContext(t *testing.T) {
 
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "canceled-ctx",
 		func(ctx context.Context) error {
 			return nil
 		},
@@ -177,7 +177,7 @@ func TestGo_contextCanceled(t *testing.T) {
 
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "ctx-canceled",
 		func(ctx context.Context) error {
 			cancel()
 			return ctx.Err()
@@ -214,7 +214,7 @@ func TestGo_withLimiter(t *testing.T) {
 	wg.Add(total)
 
 	for range total {
-		gofuncy.Go(t.Context(),
+		gofuncy.Go(t.Context(), "limiter-test",
 			func(ctx context.Context) error {
 				defer wg.Done()
 
@@ -249,7 +249,7 @@ func TestGo_withTimeout(t *testing.T) {
 
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "timeout-test",
 		func(ctx context.Context) error {
 			<-ctx.Done()
 			return ctx.Err()
@@ -275,7 +275,7 @@ func TestGo_withZeroTimeout(t *testing.T) {
 	// The function should complete normally.
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "zero-timeout",
 		func(ctx context.Context) error {
 			require.NoError(t, ctx.Err(), "context should not be canceled with zero timeout")
 			close(done)
@@ -295,7 +295,7 @@ func TestGo_withZeroTimeout(t *testing.T) {
 func TestGo_nilFunction(t *testing.T) {
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "nil-fn",
 		nil,
 		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			errCh <- err
@@ -327,7 +327,7 @@ func TestGo_concurrentWithSharedLimiter(t *testing.T) {
 	wg.Add(total)
 
 	for range total {
-		gofuncy.Go(t.Context(),
+		gofuncy.Go(t.Context(), "shared-limiter",
 			func(ctx context.Context) error {
 				defer wg.Done()
 
@@ -361,7 +361,7 @@ func TestGo_contextValuePreservation(t *testing.T) {
 	ctx := context.WithValue(t.Context(), ctxKey{}, "preserved")
 	done := make(chan struct{})
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "ctx-values",
 		func(ctx context.Context) error {
 			assert.Equal(t, "preserved", ctx.Value(ctxKey{}))
 			close(done)
@@ -382,7 +382,7 @@ func TestGo_errorHandlerReceivesDeadlineExceeded(t *testing.T) {
 
 	errCh := make(chan error, 1)
 
-	gofuncy.Go(t.Context(),
+	gofuncy.Go(t.Context(), "deadline-exceeded",
 		func(ctx context.Context) error {
 			<-ctx.Done()
 			return ctx.Err()
@@ -416,7 +416,7 @@ func TestGo_limiterAcquireFailsOnCanceledContext(t *testing.T) {
 
 	sem := semaphore.NewWeighted(1)
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "limiter-canceled",
 		func(ctx context.Context) error {
 			close(spawned)
 			return nil
@@ -449,7 +449,7 @@ func TestGo_contextValuesAccessibleInErrorHandler(t *testing.T) {
 	ctx := context.WithValue(t.Context(), ctxKey{}, "available")
 	done := make(chan struct{})
 
-	gofuncy.Go(ctx,
+	gofuncy.Go(ctx, "ctx-values-err",
 		func(ctx context.Context) error {
 			return fmt.Errorf("test error")
 		},

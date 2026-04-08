@@ -150,7 +150,7 @@ func (g *Group) Wait() error {
 		dur := time.Since(g.start).Truncate(time.Millisecond).Seconds()
 
 		groupDuration, _ := gofuncyconv.NewGroupsDuration(g.o.meter())
-		groupDuration.Record(context.WithoutCancel(g.ctx), dur, g.o.name, hasErr, len(g.errs))
+		groupDuration.Record(context.WithoutCancel(g.ctx), dur, g.o.name, hasErr)
 	}
 
 	if g.cancel != nil {

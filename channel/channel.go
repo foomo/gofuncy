@@ -199,10 +199,7 @@ func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 				return err
 			}
 
-			c.messagesDuration.Record(ctx, time.Since(start).Seconds(), c.name,
-				semconv.ChanCap(cap(c.ch)),
-				semconv.ChanSize(len(c.ch)),
-			)
+			c.messagesDuration.Record(ctx, time.Since(start).Seconds(), c.name)
 		} else {
 			if err := c.sendOne(ctx, value); err != nil {
 				return err

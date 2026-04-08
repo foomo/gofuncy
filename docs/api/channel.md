@@ -149,7 +149,7 @@ func main() {
 |--------|------|-------------|
 | `gofuncy.chans.current` | UpDownCounter | Number of open channels. Attributes: `gofuncy.chan.name`, `gofuncy.chan.cap`. |
 | `gofuncy.messages.current` | UpDownCounter | Number of in-flight (buffered) messages. Attributes: `gofuncy.chan.name`. |
-| `gofuncy.messages.duration.seconds` | Histogram | Time spent waiting for the channel to accept a value. High values indicate backpressure. Attributes: `gofuncy.chan.name`, `gofuncy.chan.cap`, `gofuncy.chan.size`. |
+| `gofuncy.messages.duration.seconds` | Histogram | Time spent waiting for the channel to accept a value. High values indicate backpressure. Attributes: `gofuncy.chan.name`. |
 
 ::: warning
 `Receive()` returns the raw Go channel, so the messages counter is incremented on `Send` but not decremented on receive. Use the counter to detect stuck or filling channels — if it only goes up, nothing is consuming.

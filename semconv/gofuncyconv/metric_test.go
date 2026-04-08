@@ -147,8 +147,8 @@ func TestGroupsDuration(t *testing.T) {
 	assert.Equal(t, "Gofuncy group/map duration histogram", m.Description())
 	assert.NotNil(t, m.Inst())
 
-	m.Record(context.Background(), 0.5, "test-group", false, 3)
-	m.Record(context.Background(), 1.0, "test-group", true, 5)
+	m.Record(context.Background(), 0.5, "test-group", false)
+	m.Record(context.Background(), 1.0, "test-group", true)
 }
 
 func TestGroupsDuration_nilMeter(t *testing.T) {
@@ -157,7 +157,7 @@ func TestGroupsDuration_nilMeter(t *testing.T) {
 	m, err := gofuncyconv.NewGroupsDuration(nil)
 	require.NoError(t, err)
 
-	m.Record(context.Background(), 0.5, "test-group", false, 3)
+	m.Record(context.Background(), 0.5, "test-group", false)
 }
 
 func TestChansCurrent(t *testing.T) {

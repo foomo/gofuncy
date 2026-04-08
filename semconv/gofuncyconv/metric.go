@@ -259,7 +259,7 @@ func (GroupsDuration) Unit() string                    { return unitSeconds }
 func (GroupsDuration) Description() string             { return groupsDurationDesc }
 func (g GroupsDuration) Inst() metric.Float64Histogram { return g.inst }
 
-func (g GroupsDuration) Record(ctx context.Context, value float64, routineName string, hasError bool, groupSize int, attrs ...attribute.KeyValue) {
+func (g GroupsDuration) Record(ctx context.Context, value float64, routineName string, hasError bool, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
 	}
@@ -267,7 +267,6 @@ func (g GroupsDuration) Record(ctx context.Context, value float64, routineName s
 	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs,
 		semconv.RoutineName(routineName),
 		semconv.Error(hasError),
-		semconv.GroupSize(groupSize),
 	)...))
 }
 

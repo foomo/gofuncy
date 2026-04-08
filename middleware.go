@@ -3,7 +3,6 @@ package gofuncy
 import (
 	"context"
 	"log/slog"
-	"runtime"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -12,6 +11,7 @@ import (
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
+	runtimex "github.com/foomo/go/runtime"
 	"github.com/foomo/gofuncy/semconv"
 	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
@@ -60,17 +60,6 @@ func withStartedCounter(fn Func, m metric.Meter, name string) Func {
 	}
 }
 
-func withFinishedCounter(fn Func, m metric.Meter, name string) Func {
-	finished, _ := gofuncyconv.NewGoroutinesFinished(m)
-
-	return func(ctx context.Context) error {
-		err := fn(ctx)
-		finished.Add(ctx, 1, name)
-
-		return err
-	}
-}
-
 func withErrorCounter(fn Func, m metric.Meter, name string) Func {
 	errors, _ := gofuncyconv.NewGoroutinesErrors(m)
 
@@ -114,23 +103,27 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 
 	traceAttrs := traceAttrsBuf[:0]
 
-	if pc, file, line, ok := runtime.Caller(callerSkip); ok {
+	if _, full, file, line, ok := runtimex.Caller(callerSkip); ok {
 		traceAttrs = append(traceAttrs,
 			otelsemconv.CodeFilePath(file),
 			otelsemconv.CodeLineNumber(line),
-			otelsemconv.CodeFunctionName(runtime.FuncForPC(pc).Name()),
+			otelsemconv.CodeFunctionName(full),
 		)
 	}
 
+	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
+
 	return func(ctx context.Context) error {
+		attrs := traceAttrs
+
 		routineName := NameFromContext(ctx)
 		if routineName != NameNoName {
-			traceAttrs = append(traceAttrs, semconv.RoutineParent(routineName))
+			attrs = append(attrs, semconv.RoutineParent(routineName))
 		}
 
 		ctx, span := o.tracer().Start(ctx,
 			spanPrefix+" "+o.name,
-			trace.WithAttributes(traceAttrs...),
+			trace.WithAttributes(attrs...),
 		)
 
 		err := fn(ctx)
@@ -142,6 +135,30 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 		span.End()
 
 		return err
+	}
+}
+
+func withStallDetector(fn Func, threshold time.Duration, handler StallHandler, m metric.Meter, l *slog.Logger, name string) Func {
+	stalled, _ := gofuncyconv.NewGoroutinesStalled(m)
+
+	return func(ctx context.Context) error {
+		timer := time.AfterFunc(threshold, func() {
+			stalled.Add(ctx, 1, name)
+
+			if handler != nil {
+				handler(ctx, name, threshold)
+				return
+			}
+
+			if l == nil {
+				l = slog.Default()
+			}
+
+			l.WarnContext(ctx, "gofuncy: stall detected", "name", name, "threshold", threshold)
+		})
+		defer timer.Stop()
+
+		return fn(ctx)
 	}
 }
 

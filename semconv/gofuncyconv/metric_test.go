@@ -38,31 +38,6 @@ func TestGoroutinesStarted_nilMeter(t *testing.T) {
 	m.Add(context.Background(), 1, "test-routine")
 }
 
-func TestGoroutinesFinished(t *testing.T) {
-	t.Parallel()
-
-	m, err := gofuncyconv.NewGoroutinesFinished(noop.Meter{})
-	require.NoError(t, err)
-
-	assert.Equal(t, "gofuncy.goroutines.finished", m.Name())
-	assert.Equal(t, "{goroutine}", m.Unit())
-	assert.Equal(t, "Total number of goroutines finished", m.Description())
-	assert.NotNil(t, m.Inst())
-
-	m.Add(context.Background(), 1, "test-routine")
-}
-
-func TestGoroutinesFinished_nilMeter(t *testing.T) {
-	t.Parallel()
-
-	m, err := gofuncyconv.NewGoroutinesFinished(nil)
-	require.NoError(t, err)
-
-	assert.Nil(t, m.Inst())
-
-	m.Add(context.Background(), 1, "test-routine")
-}
-
 func TestGoroutinesErrors(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +56,31 @@ func TestGoroutinesErrors_nilMeter(t *testing.T) {
 	t.Parallel()
 
 	m, err := gofuncyconv.NewGoroutinesErrors(nil)
+	require.NoError(t, err)
+
+	assert.Nil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesStalled(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesStalled(noop.Meter{})
+	require.NoError(t, err)
+
+	assert.Equal(t, "gofuncy.goroutines.stalled", m.Name())
+	assert.Equal(t, "{goroutine}", m.Unit())
+	assert.Equal(t, "Total number of goroutines that exceeded their stall threshold", m.Description())
+	assert.NotNil(t, m.Inst())
+
+	m.Add(context.Background(), 1, "test-routine")
+}
+
+func TestGoroutinesStalled_nilMeter(t *testing.T) {
+	t.Parallel()
+
+	m, err := gofuncyconv.NewGoroutinesStalled(nil)
 	require.NoError(t, err)
 
 	assert.Nil(t, m.Inst())

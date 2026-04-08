@@ -17,7 +17,6 @@ import (
 	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"go.opentelemetry.io/otel/trace"
 	"golang.org/x/sync/semaphore"
 )
 
@@ -313,164 +312,53 @@ func TestGroup_addWithName(t *testing.T) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// ~ Tracing
+// ~ Stall detection
 // ------------------------------------------------------------------------------------------------
 
-func TestGroup_withTracing(t *testing.T) {
+func TestGroup_withStallThreshold(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
-	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t, glossytrace.WithSpanAttributes()))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("traced-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithTracing(),
-		gofuncy.WithTracerProvider(tp),
+	var (
+		stallCount atomic.Int32
+		mu         sync.Mutex
+		stallNames []string
 	)
 
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithName("stall-group"),
+		gofuncy.WithStallThreshold(10*time.Millisecond),
+		gofuncy.WithStallHandler(func(ctx context.Context, name string, elapsed time.Duration) {
+			stallCount.Add(1)
+			mu.Lock()
+
+			stallNames = append(stallNames, name)
+			mu.Unlock()
+		}),
+	)
+
+	// slow task — should trigger stall
 	g.Add(func(ctx context.Context) error {
-		time.Sleep(time.Millisecond)
-
-		sp := trace.SpanFromContext(ctx)
-		sp.AddEvent("test event")
-
+		time.Sleep(50 * time.Millisecond)
 		return nil
-	}, gofuncy.WithName("traced-task"))
+	}, gofuncy.WithName("slow-task"))
+
+	// fast task — should NOT trigger stall
 	g.Add(func(ctx context.Context) error {
-		time.Sleep(time.Millisecond)
-
-		sp := trace.SpanFromContext(ctx)
-		sp.AddEvent("test event")
-
 		return nil
-	}, gofuncy.WithName("traced-task"))
+	}, gofuncy.WithName("fast-task"))
 
 	err := g.Wait()
 	require.NoError(t, err)
-}
+	assert.Equal(t, int32(1), stallCount.Load())
 
-func TestGroup_withTracingErrors(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("traced-group-errors"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithTracing(),
-		gofuncy.WithTracerProvider(tp),
-	)
-
-	g.Add(func(ctx context.Context) error {
-		return nil
-	})
-	g.Add(func(ctx context.Context) error {
-		return fmt.Errorf("traced error")
-	})
-
-	err := g.Wait()
-	require.Error(t, err)
+	mu.Lock()
+	assert.Contains(t, stallNames, "slow-task")
+	mu.Unlock()
 }
 
 // ------------------------------------------------------------------------------------------------
 // ~ Metrics
 // ------------------------------------------------------------------------------------------------
-
-func TestGroup_withStartedCounter(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("started-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	for range 3 {
-		g.Add(func(ctx context.Context) error {
-			return nil
-		})
-	}
-
-	err := g.Wait()
-	require.NoError(t, err)
-}
-
-func TestGroup_withFinishedCounter(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("finished-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithFinishedCounter(),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	for range 3 {
-		g.Add(func(ctx context.Context) error {
-			return nil
-		})
-	}
-
-	err := g.Wait()
-	require.NoError(t, err)
-}
-
-func TestGroup_withErrorCounter(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("error-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithErrorCounter(),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	g.Add(func(ctx context.Context) error {
-		return nil
-	})
-	g.Add(func(ctx context.Context) error {
-		return fmt.Errorf("counter error")
-	})
-
-	err := g.Wait()
-	require.Error(t, err)
-}
-
-func TestGroup_withActiveUpDownCounter(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("active-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithActiveUpDownCounter(),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	for range 3 {
-		g.Add(func(ctx context.Context) error {
-			time.Sleep(10 * time.Millisecond)
-			return nil
-		})
-	}
-
-	err := g.Wait()
-	require.NoError(t, err)
-}
 
 func TestGroup_withDurationHistogram(t *testing.T) {
 	t.Parallel()
@@ -529,10 +417,6 @@ func TestGroup_withAllMetrics(t *testing.T) {
 	g := gofuncy.NewGroup(t.Context(),
 		gofuncy.WithName("all-metrics-group"),
 		gofuncy.WithLogger(l),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithFinishedCounter(),
-		gofuncy.WithErrorCounter(),
-		gofuncy.WithActiveUpDownCounter(),
 		gofuncy.WithDurationHistogram(),
 		gofuncy.WithMeterProvider(mp),
 	)
@@ -558,12 +442,7 @@ func TestGroup_withTracingAndMetrics(t *testing.T) {
 	g := gofuncy.NewGroup(t.Context(),
 		gofuncy.WithName("full-telemetry-group"),
 		gofuncy.WithLogger(l),
-		gofuncy.WithTracing(),
 		gofuncy.WithTracerProvider(tp),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithFinishedCounter(),
-		gofuncy.WithErrorCounter(),
-		gofuncy.WithActiveUpDownCounter(),
 		gofuncy.WithDurationHistogram(),
 		gofuncy.WithMeterProvider(mp),
 	)
@@ -577,68 +456,6 @@ func TestGroup_withTracingAndMetrics(t *testing.T) {
 
 	err := g.Wait()
 	require.Error(t, err)
-}
-
-// ------------------------------------------------------------------------------------------------
-// ~ Per-function telemetry overrides
-// ------------------------------------------------------------------------------------------------
-
-func TestGroup_addWithStartedCounter(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("add-started-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	// only this function enables the started counter
-	g.Add(func(ctx context.Context) error {
-		return nil
-	}, gofuncy.WithStartedCounter())
-
-	g.Add(func(ctx context.Context) error {
-		return nil
-	})
-
-	err := g.Wait()
-	require.NoError(t, err)
-}
-
-func TestGroup_addWithAllMetrics(t *testing.T) {
-	t.Parallel()
-
-	l := slog.New(slogx.NewTestHandler(t))
-	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
-
-	g := gofuncy.NewGroup(t.Context(),
-		gofuncy.WithName("add-all-metrics-group"),
-		gofuncy.WithLogger(l),
-		gofuncy.WithMeterProvider(mp),
-	)
-
-	// per-function: enable all metrics with a custom name
-	g.Add(func(ctx context.Context) error {
-		return nil
-	},
-		gofuncy.WithName("task-a"),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithFinishedCounter(),
-		gofuncy.WithErrorCounter(),
-		gofuncy.WithActiveUpDownCounter(),
-		gofuncy.WithDurationHistogram(),
-	)
-
-	// no per-function options
-	g.Add(func(ctx context.Context) error {
-		return nil
-	})
-
-	err := g.Wait()
-	require.NoError(t, err)
 }
 
 func TestGroup_addWithLogger(t *testing.T) {
@@ -679,7 +496,6 @@ func TestGroup_failFastWithTracing(t *testing.T) {
 		gofuncy.WithName("failfast-traced"),
 		gofuncy.WithLogger(l),
 		gofuncy.WithFailFast(),
-		gofuncy.WithTracing(),
 		gofuncy.WithTracerProvider(tp),
 	)
 
@@ -711,9 +527,6 @@ func TestGroup_failFastWithMetrics(t *testing.T) {
 		gofuncy.WithName("failfast-metrics"),
 		gofuncy.WithLogger(l),
 		gofuncy.WithFailFast(),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithFinishedCounter(),
-		gofuncy.WithErrorCounter(),
 		gofuncy.WithDurationHistogram(),
 		gofuncy.WithMeterProvider(mp),
 	)
@@ -755,9 +568,6 @@ func TestGroup_withLimitAndMetrics(t *testing.T) {
 		gofuncy.WithName("limit-metrics"),
 		gofuncy.WithLogger(l),
 		gofuncy.WithLimit(limit),
-		gofuncy.WithActiveUpDownCounter(),
-		gofuncy.WithStartedCounter(),
-		gofuncy.WithFinishedCounter(),
 		gofuncy.WithMeterProvider(mp),
 	)
 
@@ -816,19 +626,18 @@ func TestGroup_addWithTracing(t *testing.T) {
 	g := gofuncy.NewGroup(t.Context(),
 		gofuncy.WithName("traced-group"),
 		gofuncy.WithLogger(l),
-		gofuncy.WithTracing(),
 		gofuncy.WithTracerProvider(tp),
 	)
 
 	g.Add(func(ctx context.Context) error {
 		return nil
-	}, gofuncy.WithTracing(),
+	},
 		gofuncy.WithName("task-a"),
 		gofuncy.WithTracerProvider(tp),
 	)
 	g.Add(func(ctx context.Context) error {
 		return nil
-	}, gofuncy.WithTracing(),
+	},
 		gofuncy.WithName("task-b"),
 		gofuncy.WithTracerProvider(tp),
 	)
@@ -923,6 +732,379 @@ func TestGroup_withLimiterCanceled(t *testing.T) {
 	g.Add(func(ctx context.Context) error {
 		return nil
 	})
+
+	err := g.Wait()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ Edge cases
+// ------------------------------------------------------------------------------------------------
+
+func TestGroup_waitCalledTwice(t *testing.T) {
+	t.Parallel()
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	g.Add(func(ctx context.Context) error {
+		return fmt.Errorf("once")
+	})
+
+	err1 := g.Wait()
+	err2 := g.Wait()
+
+	require.Error(t, err1)
+	require.Error(t, err2)
+	assert.Equal(t, err1.Error(), err2.Error())
+}
+
+func TestGroup_largeScale(t *testing.T) {
+	t.Parallel()
+
+	const n = 1000
+
+	var count atomic.Int32
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	for range n {
+		g.Add(func(ctx context.Context) error {
+			count.Add(1)
+			return nil
+		})
+	}
+
+	err := g.Wait()
+	require.NoError(t, err)
+	assert.Equal(t, int32(n), count.Load())
+}
+
+func TestGroup_allErrorSimultaneously(t *testing.T) {
+	t.Parallel()
+
+	const n = 10
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithFailFast(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	errs := make([]error, n)
+	for i := range n {
+		errs[i] = fmt.Errorf("error-%d", i)
+	}
+
+	for i := range n {
+		g.Add(func(ctx context.Context) error {
+			return errs[i]
+		})
+	}
+
+	err := g.Wait()
+	require.Error(t, err)
+}
+
+func TestGroup_externalContextCancel(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	g := gofuncy.NewGroup(ctx,
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	allStarted := make(chan struct{})
+
+	var started atomic.Int32
+
+	for range 5 {
+		g.Add(func(ctx context.Context) error {
+			if started.Add(1) == 5 {
+				close(allStarted)
+			}
+
+			<-ctx.Done()
+
+			return ctx.Err()
+		})
+	}
+
+	<-allStarted
+	cancel()
+
+	err := g.Wait()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGroup_limiterAndLimitSimultaneously(t *testing.T) {
+	t.Parallel()
+
+	// When both limiter and limit are set, the limiter takes precedence
+	// (group.go: the `else if g.sem != nil` path is skipped when o.limiter != nil).
+	const limiterWeight = 3
+
+	var (
+		active  atomic.Int32
+		maxSeen atomic.Int32
+	)
+
+	sem := semaphore.NewWeighted(int64(limiterWeight))
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithLimiter(sem),
+		gofuncy.WithLimit(1), // should be ignored
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	for range 10 {
+		g.Add(func(ctx context.Context) error {
+			cur := active.Add(1)
+
+			for {
+				old := maxSeen.Load()
+				if cur <= old || maxSeen.CompareAndSwap(old, cur) {
+					break
+				}
+			}
+
+			time.Sleep(10 * time.Millisecond)
+			active.Add(-1)
+
+			return nil
+		})
+	}
+
+	err := g.Wait()
+	require.NoError(t, err)
+	// If limit(1) were honored, maxSeen would be 1. Limiter allows 3.
+	assert.LessOrEqual(t, maxSeen.Load(), int32(limiterWeight))
+	assert.Greater(t, maxSeen.Load(), int32(1), "limiter should allow more than 1 concurrent goroutine")
+}
+
+func TestGroup_failFastCancelPropagation(t *testing.T) {
+	t.Parallel()
+
+	errorReady := make(chan struct{})
+	errorDone := make(chan struct{})
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithFailFast(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	// Goroutine A: waits for signal then errors
+	g.Add(func(ctx context.Context) error {
+		close(errorReady)
+		return fmt.Errorf("trigger")
+	})
+
+	// Goroutine B: waits for A to error, then checks context
+	g.Add(func(ctx context.Context) error {
+		<-errorReady
+		// Give a small window for cancel propagation
+		select {
+		case <-ctx.Done():
+			close(errorDone)
+			return ctx.Err()
+		case <-time.After(time.Second):
+			return fmt.Errorf("context was not canceled")
+		}
+	})
+
+	err := g.Wait()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+func TestGroup_errorOrderPreserved(t *testing.T) {
+	t.Parallel()
+
+	errA := errors.New("error-a")
+	errB := errors.New("error-b")
+	errC := errors.New("error-c")
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	g.Add(func(ctx context.Context) error { return errA })
+	g.Add(func(ctx context.Context) error { return nil })
+	g.Add(func(ctx context.Context) error { return errB })
+	g.Add(func(ctx context.Context) error { return nil })
+	g.Add(func(ctx context.Context) error { return errC })
+
+	err := g.Wait()
+	require.Error(t, err)
+	require.ErrorIs(t, err, errA)
+	require.ErrorIs(t, err, errB)
+	require.ErrorIs(t, err, errC)
+}
+
+func TestGroup_limiterAcquireFailsWithFailFast(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	sem := semaphore.NewWeighted(1)
+
+	g := gofuncy.NewGroup(ctx,
+		gofuncy.WithLimiter(sem),
+		gofuncy.WithFailFast(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	started := make(chan struct{})
+
+	// First task holds the semaphore
+	g.Add(func(ctx context.Context) error {
+		close(started)
+		<-ctx.Done()
+
+		return ctx.Err()
+	})
+
+	<-started
+	cancel()
+
+	// Second task's Acquire should fail with canceled context
+	g.Add(func(ctx context.Context) error {
+		return nil
+	})
+
+	err := g.Wait()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ Error handling validation
+// ------------------------------------------------------------------------------------------------
+
+func TestGroup_allErrorsCaptured(t *testing.T) {
+	t.Parallel()
+
+	const n = 20
+
+	sentinels := make([]error, n)
+	for i := range n {
+		sentinels[i] = fmt.Errorf("sentinel-%d", i)
+	}
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	for i := range n {
+		g.Add(func(ctx context.Context) error {
+			return sentinels[i]
+		})
+	}
+
+	err := g.Wait()
+	require.Error(t, err)
+
+	for _, sentinel := range sentinels {
+		assert.ErrorIs(t, err, sentinel)
+	}
+}
+
+func TestGroup_errorFromPanic(t *testing.T) {
+	t.Parallel()
+
+	errRegular := errors.New("regular error")
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	g.Add(func(ctx context.Context) error {
+		return errRegular
+	})
+	g.Add(func(ctx context.Context) error {
+		panic("boom")
+	})
+	g.Add(func(ctx context.Context) error {
+		return nil
+	})
+
+	err := g.Wait()
+	require.Error(t, err)
+	require.ErrorIs(t, err, errRegular)
+
+	var panicErr *gofuncy.PanicError
+
+	require.ErrorAs(t, err, &panicErr)
+	assert.Equal(t, "boom", panicErr.Value)
+}
+
+func TestGroup_parentCancelPropagates(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(t.Context())
+
+	g := gofuncy.NewGroup(ctx,
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	allStarted := make(chan struct{})
+
+	var started atomic.Int32
+
+	const n = 3
+
+	for range n {
+		g.Add(func(ctx context.Context) error {
+			if started.Add(1) == n {
+				close(allStarted)
+			}
+
+			<-ctx.Done()
+
+			return ctx.Err()
+		})
+	}
+
+	<-allStarted
+	cancel()
 
 	err := g.Wait()
 	require.Error(t, err)

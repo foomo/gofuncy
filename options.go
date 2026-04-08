@@ -46,15 +46,16 @@ func (f groupOnlyOpt) applyGroup(o *options) { f(o) }
 // ------------------------------------------------------------------------------------------------
 
 type options struct {
-	l            *slog.Logger
-	name         string
-	timeout      time.Duration
-	callerSkip   int
-	errorHandler ErrorHandler
+	l              *slog.Logger
+	name           string
+	timeout        time.Duration
+	callerSkip     int
+	errorHandler   ErrorHandler
+	stallThreshold time.Duration
+	stallHandler   StallHandler
 	// telemetry
 	tracing             bool
 	startedCounter      bool
-	finishedCounter     bool
 	errorCounter        bool
 	activeUpDownCounter bool
 	durationHistogram   bool
@@ -111,9 +112,16 @@ func (o options) merge(override options) options {
 		o.timeout = override.timeout
 	}
 
+	if override.stallThreshold > 0 {
+		o.stallThreshold = override.stallThreshold
+	}
+
+	if override.stallHandler != nil {
+		o.stallHandler = override.stallHandler
+	}
+
 	o.tracing = o.tracing || override.tracing
 	o.startedCounter = o.startedCounter || override.startedCounter
-	o.finishedCounter = o.finishedCounter || override.finishedCounter
 	o.errorCounter = o.errorCounter || override.errorCounter
 	o.activeUpDownCounter = o.activeUpDownCounter || override.activeUpDownCounter
 	o.durationHistogram = o.durationHistogram || override.durationHistogram
@@ -139,7 +147,11 @@ func (o options) merge(override options) options {
 
 func newGoOptions(opts []GoOption) options {
 	o := options{
-		name: NameNoName,
+		name:                NameNoName,
+		tracing:             true,
+		startedCounter:      true,
+		errorCounter:        true,
+		activeUpDownCounter: true,
 	}
 
 	for _, opt := range opts {
@@ -153,7 +165,11 @@ func newGoOptions(opts []GoOption) options {
 
 func newGroupOptions(opts []GroupOption) options {
 	o := options{
-		name: NameNoName,
+		name:                NameNoName,
+		tracing:             true,
+		startedCounter:      true,
+		errorCounter:        true,
+		activeUpDownCounter: true,
 	}
 
 	for _, opt := range opts {
@@ -196,45 +212,38 @@ func WithLogger(l *slog.Logger) baseOpt {
 	}
 }
 
-// WithTracing enables tracing for the operation.
-func WithTracing() baseOpt {
-	return func(o *options) {
-		o.tracing = true
-	}
-}
-
-// WithStartedCounter enables the started counter metric.
-func WithStartedCounter() baseOpt {
-	return func(o *options) {
-		o.startedCounter = true
-	}
-}
-
-// WithFinishedCounter enables the finished counter metric.
-func WithFinishedCounter() baseOpt {
-	return func(o *options) {
-		o.finishedCounter = true
-	}
-}
-
-// WithErrorCounter enables the error counter metric.
-func WithErrorCounter() baseOpt {
-	return func(o *options) {
-		o.errorCounter = true
-	}
-}
-
-// WithActiveUpDownCounter enables the active up-down counter metric.
-func WithActiveUpDownCounter() baseOpt {
-	return func(o *options) {
-		o.activeUpDownCounter = true
-	}
-}
-
 // WithDurationHistogram enables the duration histogram metric.
 func WithDurationHistogram() baseOpt {
 	return func(o *options) {
 		o.durationHistogram = true
+	}
+}
+
+// WithoutTracing disables tracing for the operation.
+func WithoutTracing() baseOpt {
+	return func(o *options) {
+		o.tracing = false
+	}
+}
+
+// WithoutStartedCounter disables the started counter metric.
+func WithoutStartedCounter() baseOpt {
+	return func(o *options) {
+		o.startedCounter = false
+	}
+}
+
+// WithoutErrorCounter disables the error counter metric.
+func WithoutErrorCounter() baseOpt {
+	return func(o *options) {
+		o.errorCounter = false
+	}
+}
+
+// WithoutActiveUpDownCounter disables the active up-down counter metric.
+func WithoutActiveUpDownCounter() baseOpt {
+	return func(o *options) {
+		o.activeUpDownCounter = false
 	}
 }
 
@@ -263,6 +272,23 @@ func WithTracerProvider(tp trace.TracerProvider) baseOpt {
 func WithLimiter(l *semaphore.Weighted) baseOpt {
 	return func(o *options) {
 		o.limiter = l
+	}
+}
+
+// WithStallThreshold enables stall detection. If a goroutine runs longer than
+// the threshold, a warning is logged and a metric is emitted. The goroutine is
+// not cancelled. Use WithStallHandler to customize the callback.
+func WithStallThreshold(d time.Duration) baseOpt {
+	return func(o *options) {
+		o.stallThreshold = d
+	}
+}
+
+// WithStallHandler sets a custom callback for stall detection.
+// If not set, stalls are logged via slog.
+func WithStallHandler(h StallHandler) baseOpt {
+	return func(o *options) {
+		o.stallHandler = h
 	}
 }
 

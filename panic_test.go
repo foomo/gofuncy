@@ -28,3 +28,13 @@ func TestPanicError_ErrorAs(t *testing.T) {
 	assert.Equal(t, 42, target.Value)
 	assert.Equal(t, []byte("stack"), target.Stack)
 }
+
+func TestPanicError_NonStringValue(t *testing.T) {
+	t.Parallel()
+
+	err := &gofuncy.PanicError{Value: 42}
+	assert.Equal(t, "panic: 42", err.Error())
+
+	err2 := &gofuncy.PanicError{Value: struct{ X int }{X: 7}}
+	assert.Equal(t, "panic: {7}", err2.Error())
+}

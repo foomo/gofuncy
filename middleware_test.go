@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -166,33 +167,6 @@ func TestWithStartedCounter_errorPassthrough(t *testing.T) {
 }
 
 // ------------------------------------------------------------------------------------------------
-// ~ withFinishedCounter
-// ------------------------------------------------------------------------------------------------
-
-func TestWithFinishedCounter(t *testing.T) {
-	t.Parallel()
-
-	called := false
-	fn := withFinishedCounter(func(ctx context.Context) error {
-		called = true
-		return nil
-	}, metricnoop.Meter{}, "test")
-
-	require.NoError(t, fn(context.Background()))
-	assert.True(t, called)
-}
-
-func TestWithFinishedCounter_errorPassthrough(t *testing.T) {
-	t.Parallel()
-
-	fn := withFinishedCounter(func(ctx context.Context) error {
-		return fmt.Errorf("fail")
-	}, metricnoop.Meter{}, "test")
-
-	require.EqualError(t, fn(context.Background()), "fail")
-}
-
-// ------------------------------------------------------------------------------------------------
 // ~ withErrorCounter
 // ------------------------------------------------------------------------------------------------
 
@@ -319,6 +293,92 @@ func TestWithTracing_withError(t *testing.T) {
 }
 
 // ------------------------------------------------------------------------------------------------
+// ~ withStallDetector
+// ------------------------------------------------------------------------------------------------
+
+func TestWithStallDetector_fires(t *testing.T) {
+	t.Parallel()
+
+	called := make(chan struct{})
+
+	handler := StallHandler(func(ctx context.Context, name string, elapsed time.Duration) {
+		close(called)
+	})
+
+	fn := withStallDetector(func(ctx context.Context) error {
+		<-called
+		return nil
+	}, 10*time.Millisecond, handler, metricnoop.Meter{}, nil, "test")
+
+	require.NoError(t, fn(context.Background()))
+}
+
+func TestWithStallDetector_doesNotFire(t *testing.T) {
+	t.Parallel()
+
+	fired := false
+
+	handler := StallHandler(func(ctx context.Context, name string, elapsed time.Duration) {
+		fired = true
+	})
+
+	fn := withStallDetector(func(ctx context.Context) error {
+		return nil
+	}, time.Second, handler, metricnoop.Meter{}, nil, "test")
+
+	require.NoError(t, fn(context.Background()))
+	assert.False(t, fired)
+}
+
+func TestWithStallDetector_defaultLogger(t *testing.T) {
+	t.Parallel()
+
+	var (
+		buf syncBuffer
+	)
+
+	l := slog.New(slog.NewTextHandler(&buf, &slog.HandlerOptions{Level: slog.LevelWarn}))
+
+	fn := withStallDetector(func(ctx context.Context) error {
+		time.Sleep(50 * time.Millisecond)
+		return nil
+	}, 10*time.Millisecond, nil, metricnoop.Meter{}, l, "slow-task")
+
+	require.NoError(t, fn(context.Background()))
+	assert.Contains(t, buf.String(), "stall detected")
+	assert.Contains(t, buf.String(), "slow-task")
+}
+
+type syncBuffer struct {
+	mu  sync.Mutex
+	buf bytes.Buffer
+}
+
+func (b *syncBuffer) Write(p []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.Write(p)
+}
+
+func (b *syncBuffer) String() string {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+
+	return b.buf.String()
+}
+
+func TestWithStallDetector_errorPassthrough(t *testing.T) {
+	t.Parallel()
+
+	fn := withStallDetector(func(ctx context.Context) error {
+		return fmt.Errorf("fail")
+	}, time.Second, nil, metricnoop.Meter{}, nil, "test")
+
+	require.EqualError(t, fn(context.Background()), "fail")
+}
+
+// ------------------------------------------------------------------------------------------------
 // ~ WithMiddleware (via Go integration)
 // ------------------------------------------------------------------------------------------------
 
@@ -429,4 +489,50 @@ func TestHandleError_defaultLogger(t *testing.T) {
 
 	// should not panic with nil handler and nil logger
 	handleError(context.Background(), fmt.Errorf("default"), nil, nil, "test")
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ Edge case tests
+// ------------------------------------------------------------------------------------------------
+
+func TestWithTimeout_zeroValue(t *testing.T) {
+	t.Parallel()
+
+	// context.WithTimeout(ctx, 0) creates an immediately-expired context.
+	fn := withTimeout(func(ctx context.Context) error {
+		return ctx.Err()
+	}, 0)
+
+	err := fn(context.Background())
+	require.ErrorIs(t, err, context.DeadlineExceeded)
+}
+
+func TestWithRecover_nilPanic(t *testing.T) {
+	t.Parallel()
+
+	fn := withRecover(func(ctx context.Context) error {
+		panic(nil)
+	})
+
+	err := fn(context.Background())
+	require.Error(t, err)
+
+	var panicErr *PanicError
+	require.ErrorAs(t, err, &panicErr)
+}
+
+func TestWithContextInjection_overwritesPrevious(t *testing.T) {
+	t.Parallel()
+
+	// Set name "A" in context, then inject "B" — should get name="B", parent="A"
+	ctx := injectNameIntoContext(context.Background(), "A")
+
+	fn := withContextInjection(func(ctx context.Context) error {
+		assert.Equal(t, "B", NameFromContext(ctx))
+		assert.Equal(t, "A", ParentFromContext(ctx))
+
+		return nil
+	}, "B")
+
+	require.NoError(t, fn(ctx))
 }

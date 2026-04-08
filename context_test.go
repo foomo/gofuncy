@@ -1,10 +1,13 @@
 package gofuncy_test
 
 import (
+	"context"
 	"testing"
+	"time"
 
 	"github.com/foomo/gofuncy"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestCtx_NoName(t *testing.T) {
@@ -21,4 +24,74 @@ func TestCtx_Root(t *testing.T) {
 func TestCtx_Parent(t *testing.T) {
 	t.Parallel()
 	assert.Empty(t, gofuncy.Ctx(t.Context()).Parent())
+}
+
+func TestContext_nestedGoRoutines(t *testing.T) {
+	type result struct {
+		name   string
+		parent string
+	}
+
+	ch := make(chan result, 1)
+	done := make(chan struct{})
+
+	gofuncy.Go(t.Context(),
+		func(ctx context.Context) error {
+			gofuncy.Go(ctx,
+				func(ctx context.Context) error {
+					ch <- result{
+						name:   gofuncy.NameFromContext(ctx),
+						parent: gofuncy.ParentFromContext(ctx),
+					}
+
+					close(done)
+
+					return nil
+				},
+				gofuncy.WithName("child"),
+			)
+
+			<-done
+
+			return nil
+		},
+		gofuncy.WithName("parent"),
+	)
+
+	select {
+	case r := <-ch:
+		assert.Equal(t, "child", r.name)
+		assert.Equal(t, "parent", r.parent)
+	case <-time.After(time.Second):
+		t.Fatal("timed out waiting for nested Go routines")
+	}
+}
+
+func TestContext_existingDeadlineShorterThanTimeout(t *testing.T) {
+	t.Parallel()
+
+	errCh := make(chan error, 1)
+
+	// Parent context has a 20ms deadline
+	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
+	defer cancel()
+
+	gofuncy.Go(ctx,
+		func(ctx context.Context) error {
+			<-ctx.Done()
+			return ctx.Err()
+		},
+		// WithTimeout sets a 5s timeout, but parent's 20ms deadline wins
+		gofuncy.WithTimeout(5*time.Second),
+		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
+			errCh <- err
+		}),
+	)
+
+	select {
+	case err := <-errCh:
+		require.ErrorIs(t, err, context.DeadlineExceeded)
+	case <-time.After(time.Second):
+		t.Fatal("timed out — parent deadline should have triggered within 20ms")
+	}
 }

@@ -75,15 +75,11 @@ func (g *Group) Add(fn Func, opts ...GoOption) {
 		run = m(run)
 	}
 
-	if o.startedCounter || o.finishedCounter || o.errorCounter || o.activeUpDownCounter || o.durationHistogram {
+	if o.startedCounter || o.errorCounter || o.activeUpDownCounter || o.durationHistogram {
 		m := o.meter()
 
 		if o.startedCounter {
 			run = withStartedCounter(run, m, o.name)
-		}
-
-		if o.finishedCounter {
-			run = withFinishedCounter(run, m, o.name)
 		}
 
 		if o.errorCounter {
@@ -101,6 +97,10 @@ func (g *Group) Add(fn Func, opts ...GoOption) {
 
 	if o.tracing {
 		run = withTracing(run, &o, "gofuncy.group.add", 2)
+	}
+
+	if o.stallThreshold > 0 {
+		run = withStallDetector(run, o.stallThreshold, o.stallHandler, o.meter(), o.l, o.name)
 	}
 
 	if o.timeout > 0 {

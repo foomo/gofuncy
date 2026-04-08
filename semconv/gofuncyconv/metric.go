@@ -17,11 +17,11 @@ const (
 	goroutinesStartedName = "gofuncy.goroutines.started"
 	goroutinesStartedDesc = "Total number of goroutines started"
 
-	goroutinesFinishedName = "gofuncy.goroutines.finished"
-	goroutinesFinishedDesc = "Total number of goroutines finished"
-
 	goroutinesErrorsName = "gofuncy.goroutines.errors"
 	goroutinesErrorsDesc = "Total number of goroutine errors"
+
+	goroutinesStalledName = "gofuncy.goroutines.stalled"
+	goroutinesStalledDesc = "Total number of goroutines that exceeded their stall threshold"
 
 	goroutinesActiveName = "gofuncy.goroutines.active"
 	goroutinesActiveDesc = "Number of currently active goroutines"
@@ -88,41 +88,6 @@ func (g GoroutinesStarted) Add(ctx context.Context, incr int64, routineName stri
 }
 
 // ------------------------------------------------------------------------------------------------
-// ~ GoroutinesFinished
-// ------------------------------------------------------------------------------------------------
-
-// GoroutinesFinished counts the total number of goroutines finished.
-type GoroutinesFinished struct {
-	inst metric.Int64Counter
-}
-
-func NewGoroutinesFinished(m metric.Meter) (GoroutinesFinished, error) {
-	if m == nil {
-		return GoroutinesFinished{}, nil
-	}
-
-	c, err := m.Int64Counter(goroutinesFinishedName,
-		metric.WithDescription(goroutinesFinishedDesc),
-		metric.WithUnit(unitGoroutine),
-	)
-
-	return GoroutinesFinished{inst: c}, err
-}
-
-func (GoroutinesFinished) Name() string                { return goroutinesFinishedName }
-func (GoroutinesFinished) Unit() string                { return unitGoroutine }
-func (GoroutinesFinished) Description() string         { return goroutinesFinishedDesc }
-func (g GoroutinesFinished) Inst() metric.Int64Counter { return g.inst }
-
-func (g GoroutinesFinished) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
-	if g.inst == nil {
-		return
-	}
-
-	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
-}
-
-// ------------------------------------------------------------------------------------------------
 // ~ GoroutinesErrors
 // ------------------------------------------------------------------------------------------------
 
@@ -150,6 +115,41 @@ func (GoroutinesErrors) Description() string         { return goroutinesErrorsDe
 func (g GoroutinesErrors) Inst() metric.Int64Counter { return g.inst }
 
 func (g GoroutinesErrors) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+	if g.inst == nil {
+		return
+	}
+
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ GoroutinesStalled
+// ------------------------------------------------------------------------------------------------
+
+// GoroutinesStalled counts the total number of goroutines that exceeded their stall threshold.
+type GoroutinesStalled struct {
+	inst metric.Int64Counter
+}
+
+func NewGoroutinesStalled(m metric.Meter) (GoroutinesStalled, error) {
+	if m == nil {
+		return GoroutinesStalled{}, nil
+	}
+
+	c, err := m.Int64Counter(goroutinesStalledName,
+		metric.WithDescription(goroutinesStalledDesc),
+		metric.WithUnit(unitGoroutine),
+	)
+
+	return GoroutinesStalled{inst: c}, err
+}
+
+func (GoroutinesStalled) Name() string                { return goroutinesStalledName }
+func (GoroutinesStalled) Unit() string                { return unitGoroutine }
+func (GoroutinesStalled) Description() string         { return goroutinesStalledDesc }
+func (g GoroutinesStalled) Inst() metric.Int64Counter { return g.inst }
+
+func (g GoroutinesStalled) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
 	}

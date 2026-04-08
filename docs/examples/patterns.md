@@ -214,7 +214,7 @@ func main() {
 	}
 
 	// Process all items, 10 at a time
-	err := gofuncy.ForEach(ctx, "batch-process", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(ctx, "batch-process", items, func(ctx context.Context, item int) error {
 		// Simulate processing
 		if item%25 == 0 {
 			fmt.Printf("processing item %d\n", item)

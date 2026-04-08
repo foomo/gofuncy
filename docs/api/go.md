@@ -3,8 +3,8 @@ prev:
   text: Core Concepts
   link: /guide/concepts
 next:
-  text: Group
-  link: /api/group
+  text: Start
+  link: /api/start
 ---
 
 # Go
@@ -28,7 +28,7 @@ func Go(ctx context.Context, name string, fn Func, opts ...GoOption)
 
 ### Accepted Options
 
-**Shared** (`baseOpt`): `WithLogger`, `WithTimeout`, `WithMiddleware`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
+**Shared** (`baseOpt`): `WithTimeout`, `WithRetry`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
 
 **Go-only** (`goOnlyOpt`): `WithErrorHandler`, `WithCallerSkip`
 
@@ -91,7 +91,7 @@ func main() {
 type Func func(ctx context.Context) error
 ```
 
-The function type accepted by `Go`, `Group.Add`, `ForEach`, and `Map`.
+The function type accepted by `Go`, `Group.Add`, `All`, and `Map`.
 
 ### ErrorHandler
 

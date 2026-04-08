@@ -7,14 +7,14 @@ next:
   link: /api/map
 ---
 
-# ForEach
+# All
 
 Executes a function for each item in a slice concurrently. Uses a `Group` internally.
 
 ## Signature
 
 ```go
-func ForEach[T any](ctx context.Context, name string, items []T, fn func(ctx context.Context, item T) error, opts ...GroupOption) error
+func All[T any](ctx context.Context, name string, items []T, fn func(ctx context.Context, item T) error, opts ...GroupOption) error
 ```
 
 ### Type Parameters
@@ -64,7 +64,7 @@ func main() {
 		"https://api.example.com/products",
 	}
 
-	err := gofuncy.ForEach(ctx, "fetch-all", urls, func(ctx context.Context, url string) error {
+	err := gofuncy.All(ctx, "fetch-all", urls, func(ctx context.Context, url string) error {
 		fmt.Println("fetching", url)
 		// fetch(ctx, url)
 		return nil
@@ -78,5 +78,5 @@ func main() {
 ```
 
 ::: tip
-`ForEach` is a convenience wrapper around `NewGroup` + `Add` + `Wait`. If you need per-item options or want to add functions dynamically, use `Group` directly.
+`All` is a convenience wrapper around `NewGroup` + `Add` + `Wait`. If you need per-item options or want to add functions dynamically, use `Group` directly.
 :::

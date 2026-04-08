@@ -1,10 +1,11 @@
 ---
 prev:
-  text: ForEach
-  link: /api/foreach
+  text: All
+  link: /api/all
 next:
   text: Options
   link: /api/options
+
 ---
 
 # Map

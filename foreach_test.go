@@ -13,14 +13,14 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestForEach_basic(t *testing.T) {
+func TestAll_basic(t *testing.T) {
 	t.Parallel()
 
 	var count atomic.Int32
 
 	items := []int{1, 2, 3, 4, 5}
 
-	err := gofuncy.ForEach(t.Context(), "basic", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), "basic", items, func(ctx context.Context, item int) error {
 		count.Add(1)
 		return nil
 	})
@@ -29,10 +29,10 @@ func TestForEach_basic(t *testing.T) {
 	assert.Equal(t, int32(5), count.Load())
 }
 
-func TestForEach_empty(t *testing.T) {
+func TestAll_empty(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.ForEach(t.Context(), "empty", []int{}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), "empty", []int{}, func(ctx context.Context, item int) error {
 		t.Fatal("should not be called")
 		return nil
 	})
@@ -40,7 +40,7 @@ func TestForEach_empty(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestForEach_errors(t *testing.T) {
+func TestAll_errors(t *testing.T) {
 	t.Parallel()
 
 	errA := errors.New("error a")
@@ -48,7 +48,7 @@ func TestForEach_errors(t *testing.T) {
 
 	items := []int{1, 2, 3}
 
-	err := gofuncy.ForEach(t.Context(), "with-errors", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), "with-errors", items, func(ctx context.Context, item int) error {
 		switch item {
 		case 1:
 			return errA
@@ -64,12 +64,12 @@ func TestForEach_errors(t *testing.T) {
 	require.ErrorIs(t, err, errB)
 }
 
-func TestForEach_failFast(t *testing.T) {
+func TestAll_failFast(t *testing.T) {
 	t.Parallel()
 
 	started := make(chan struct{})
 
-	err := gofuncy.ForEach(t.Context(), "fail-fast", []int{1, 2},
+	err := gofuncy.All(t.Context(), "fail-fast", []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)
@@ -88,7 +88,7 @@ func TestForEach_failFast(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
-func TestForEach_withLimit(t *testing.T) {
+func TestAll_withLimit(t *testing.T) {
 	t.Parallel()
 
 	const limit = 2
@@ -103,7 +103,7 @@ func TestForEach_withLimit(t *testing.T) {
 		items[i] = i
 	}
 
-	err := gofuncy.ForEach(t.Context(), "with-limit", items,
+	err := gofuncy.All(t.Context(), "with-limit", items,
 		func(ctx context.Context, item int) error {
 			cur := active.Add(1)
 
@@ -126,12 +126,12 @@ func TestForEach_withLimit(t *testing.T) {
 	assert.LessOrEqual(t, maxSeen.Load(), int32(limit))
 }
 
-func TestForEach_singleItem(t *testing.T) {
+func TestAll_singleItem(t *testing.T) {
 	t.Parallel()
 
 	var got int
 
-	err := gofuncy.ForEach(t.Context(), "single", []int{42}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), "single", []int{42}, func(ctx context.Context, item int) error {
 		got = item
 		return nil
 	})
@@ -140,10 +140,10 @@ func TestForEach_singleItem(t *testing.T) {
 	assert.Equal(t, 42, got)
 }
 
-func TestForEach_panic(t *testing.T) {
+func TestAll_panic(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.ForEach(t.Context(), "panic", []int{1}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), "panic", []int{1}, func(ctx context.Context, item int) error {
 		panic("foreach panic")
 	})
 
@@ -155,14 +155,14 @@ func TestForEach_panic(t *testing.T) {
 	assert.Equal(t, "foreach panic", panicErr.Value)
 }
 
-func TestForEach_contextCancel(t *testing.T) {
+func TestAll_contextCancel(t *testing.T) {
 	t.Parallel()
 
 	ctx, cancel := context.WithCancel(t.Context())
 
 	started := make(chan struct{})
 
-	err := gofuncy.ForEach(ctx, "ctx-cancel", []int{1, 2},
+	err := gofuncy.All(ctx, "ctx-cancel", []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)

@@ -18,7 +18,7 @@ hero:
 
 features:
   - title: Type-Safe Generics
-    details: ForEach and Map use Go generics for fully typed concurrent iteration and transformation, with order-preserving results.
+    details: All and Map use Go generics for fully typed concurrent iteration and transformation, with order-preserving results.
   - title: Functional Options
     details: Composable options pattern for configuring names, timeouts, middleware, concurrency limits, and telemetry per call.
   - title: OpenTelemetry Built-In

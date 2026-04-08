@@ -26,9 +26,13 @@ gofuncy provides a small set of functions that wrap common goroutine patterns wi
 | Function | Purpose |
 |----------|---------|
 | [`Go`](/api/go) | Fire-and-forget goroutine with panic recovery and error handling |
+| [`Start`](/api/start) | Spawn a goroutine and collect the result later via a wait function |
+| [`Do`](/api/do) | Synchronous execution with the full middleware chain (no goroutine) |
 | [`NewGroup`](/api/group) | Managed set of concurrent functions with shared lifecycle |
-| [`ForEach`](/api/foreach) | Concurrent iteration over a slice |
+| [`All`](/api/all) | Concurrent iteration over a slice |
 | [`Map`](/api/map) | Concurrent transformation of a slice, preserving order |
+
+The [`channel`](/api/channel) subpackage provides an observable generic channel wrapper with built-in metrics for queue depth, in-flight messages, and backpressure detection.
 
 Every function supports a rich [options pattern](/api/options) for configuring behavior per call.
 

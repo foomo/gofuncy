@@ -15,8 +15,8 @@ gofuncy uses functional options to configure behavior. There are three option ca
 
 | Type | Applies to | Example |
 |------|-----------|---------|
-| `baseOpt` | `Go`, `NewGroup`, `Group.Add` | `WithTimeout`, `WithMiddleware`, `WithLogger` |
-| `goOnlyOpt` | `Go`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
+| `baseOpt` | `Do`, `Go`, `NewGroup`, `Group.Add` | `WithRetry`, `WithTimeout`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger` |
+| `goOnlyOpt` | `Do`, `Go`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
 | `groupOnlyOpt` | `NewGroup` | `WithLimit`, `WithFailFast` |
 
 Options are implemented as interfaces (`GoOption` and `GroupOption`), so the compiler prevents you from passing a group-only option to `Go()` or a go-only option to `NewGroup()`.
@@ -64,7 +64,7 @@ if errors.As(err, &panicErr) {
 
 - `Go` -- errors are passed to an `ErrorHandler` callback. The default handler logs via `slog.ErrorContext`. Override with `WithErrorHandler`.
 - `Group.Wait` -- returns all errors from added functions via `errors.Join`.
-- `ForEach` and `Map` -- return all errors via `errors.Join`.
+- `All` and `Map` -- return all errors via `errors.Join`.
 
 ### Fail-Fast
 
@@ -124,15 +124,85 @@ gofuncy.Go(ctx, "task-2", fn2, gofuncy.WithLimiter(limiter))
 `WithLimiter` acquires the semaphore **before** spawning the goroutine. If the context is cancelled while waiting, the error is handled immediately and the goroutine is not started.
 :::
 
-## Middleware
+## Resilience
 
-The `Middleware` type wraps a `Func` to add cross-cutting behavior:
+gofuncy provides built-in resilience primitives configured via options. The framework applies them in the correct order automatically:
+
+```
+fn → timeout → retry → circuitBreaker → fallback
+```
+
+### Retry
+
+Retries transient errors with configurable backoff:
+
+```go
+gofuncy.Go(ctx, "fetch", fetchData,
+    gofuncy.WithRetry(3),
+    gofuncy.WithTimeout(5*time.Second), // per-attempt timeout
+)
+```
+
+By default, retry uses exponential backoff with jitter (100ms base, 2x multiplier, 30s cap) and skips non-retryable errors (`context.Canceled`, `context.DeadlineExceeded`, `*PanicError`).
+
+See the [Options reference](/api/options) for all retry options and backoff strategies.
+
+### Circuit Breaker
+
+Stops calling a broken dependency after repeated failures:
+
+```go
+var apiBreaker = gofuncy.NewCircuitBreaker(
+    gofuncy.CircuitBreakerThreshold(5),
+    gofuncy.CircuitBreakerCooldown(30*time.Second),
+)
+
+gofuncy.Go(ctx, "api-call", callAPI,
+    gofuncy.WithCircuitBreaker(apiBreaker),
+)
+```
+
+The circuit breaker is stateful — share a single instance across all calls to the same dependency.
+
+### Fallback
+
+Graceful degradation when a function fails:
+
+```go
+g.Add("fetch", fetchFromAPI,
+    gofuncy.WithRetry(3),
+    gofuncy.WithFallback(func(ctx context.Context, err error) error {
+        return loadFromCache(ctx)
+    }),
+)
+```
+
+See the [Options reference](/api/options) for fallback options.
+
+### Combining Resilience Options
+
+All resilience options compose naturally. The framework guarantees the correct ordering:
+
+```go
+g.Add("api-call", callAPI,
+    gofuncy.WithTimeout(2*time.Second),          // each attempt: 2s
+    gofuncy.WithRetry(3),                         // up to 3 attempts
+    gofuncy.WithCircuitBreaker(apiBreaker),       // fail fast on broken dep
+    gofuncy.WithFallback(func(ctx context.Context, err error) error {
+        return loadFromCache(ctx)                 // last resort
+    }),
+)
+```
+
+## Custom Middleware
+
+For custom cross-cutting behavior, use the `Middleware` type with `WithMiddleware`:
 
 ```go
 type Middleware func(Func) Func
 ```
 
-Middlewares are applied in order via `WithMiddleware`. They compose into a chain that executes from outermost to innermost:
+User middlewares are applied **after** the built-in resilience chain and **before** telemetry:
 
 ```go
 logging := func(next gofuncy.Func) gofuncy.Func {
@@ -146,6 +216,8 @@ logging := func(next gofuncy.Func) gofuncy.Func {
 
 gofuncy.Go(ctx, "logged-task", fn, gofuncy.WithMiddleware(logging))
 ```
+
+The built-in resilience primitives (`Retry`, `Fallback`) are also available as middleware constructors for advanced use cases that require custom ordering via `WithMiddleware`.
 
 ## Telemetry
 

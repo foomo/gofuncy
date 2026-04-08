@@ -162,6 +162,63 @@ func withStallDetector(fn Func, threshold time.Duration, handler StallHandler, m
 	}
 }
 
+func buildChain(fn Func, o *options, spanPrefix string, callerSkip int) Func {
+	run := fn
+	run = withRecover(run)
+
+	// resilience chain (innermost → outermost)
+	if o.timeout > 0 {
+		run = withTimeout(run, o.timeout)
+	}
+
+	if o.retryAttempts > 1 {
+		run = Retry(o.retryAttempts, o.retryOpts...)(run)
+	}
+
+	if o.circuitBreaker != nil {
+		run = o.circuitBreaker.middleware()(run)
+	}
+
+	if o.fallbackFn != nil {
+		run = Fallback(o.fallbackFn, o.fallbackOpts...)(run)
+	}
+
+	// user middlewares
+	for _, m := range o.middlewares {
+		run = m(run)
+	}
+
+	if o.startedCounter || o.errorCounter || o.activeUpDownCounter || o.durationHistogram {
+		m := o.meter()
+
+		if o.startedCounter {
+			run = withStartedCounter(run, m, o.name)
+		}
+
+		if o.errorCounter {
+			run = withErrorCounter(run, m, o.name)
+		}
+
+		if o.activeUpDownCounter {
+			run = withActiveUpDownCounter(run, m, o.name)
+		}
+
+		if o.durationHistogram {
+			run = withDurationHistogram(run, m, o.name)
+		}
+	}
+
+	if o.tracing {
+		run = withTracing(run, o, spanPrefix, callerSkip)
+	}
+
+	if o.stallThreshold > 0 {
+		run = withStallDetector(run, o.stallThreshold, o.stallHandler, o.meter(), o.l, o.name)
+	}
+
+	return run
+}
+
 func handleError(ctx context.Context, err error, handler ErrorHandler, l *slog.Logger, name string) {
 	if handler != nil {
 		handler(ctx, err)

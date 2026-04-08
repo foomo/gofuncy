@@ -3,8 +3,9 @@ prev:
   text: Map
   link: /api/map
 next:
-  text: Basic Examples
-  link: /examples/basic
+  text: Channel
+  link: /api/channel
+
 ---
 
 # Options
@@ -15,11 +16,95 @@ All options are configured via functional option constructors. Options fall into
 
 | Category | Interface | Accepted by |
 |----------|-----------|-------------|
-| Shared | `GoOption` + `GroupOption` | `Go`, `NewGroup`, `Group.Add` |
-| Go-only | `GoOption` | `Go`, `Group.Add` |
-| Group-only | `GroupOption` | `NewGroup`, `ForEach`, `Map` |
+| Shared | `GoOption` + `GroupOption` | `Do`, `Start`, `Go`, `NewGroup`, `Group.Add` |
+| Go-only | `GoOption` | `Do`, `Start`, `Go`, `Group.Add` |
+| Group-only | `GroupOption` | `NewGroup`, `All`, `Map` |
 
 The compiler enforces these constraints. You cannot pass a `groupOnlyOpt` to `Go()` or a `goOnlyOpt` to `NewGroup()`.
+
+## Resilience Options
+
+These options configure the built-in resilience chain. The framework applies them in the correct order automatically:
+
+```
+fn → timeout → retry → circuitBreaker → fallback
+```
+
+### WithTimeout
+
+```go
+func WithTimeout(timeout time.Duration) baseOpt
+```
+
+Sets a per-invocation timeout. When combined with `WithRetry`, each retry attempt gets its own fresh deadline.
+
+```go
+g.Add("fetch", fetchData,
+    gofuncy.WithTimeout(5*time.Second),
+    gofuncy.WithRetry(3),
+)
+// Each of the 3 attempts gets 5s
+```
+
+### WithRetry
+
+```go
+func WithRetry(maxAttempts int, opts ...RetryOption) baseOpt
+```
+
+Configures automatic retry. `maxAttempts` is the total number of attempts (1 = no retry, 3 = initial + 2 retries).
+
+```go
+g.Add("fetch", fetchData,
+    gofuncy.WithRetry(3, gofuncy.RetryBackoff(gofuncy.BackoffConstant(time.Second))),
+)
+```
+
+### WithCircuitBreaker
+
+```go
+func WithCircuitBreaker(cb *CircuitBreaker) baseOpt
+```
+
+Sets a circuit breaker for the operation. The circuit breaker is stateful — create one via `NewCircuitBreaker` and share it across all calls to the same dependency.
+
+```go
+var apiBreaker = gofuncy.NewCircuitBreaker(
+    gofuncy.CircuitBreakerThreshold(5),
+    gofuncy.CircuitBreakerCooldown(30*time.Second),
+)
+
+g.Add("api-call", callAPI, gofuncy.WithCircuitBreaker(apiBreaker))
+```
+
+### WithFallback
+
+```go
+func WithFallback(fn func(ctx context.Context, err error) error, opts ...FallbackOption) baseOpt
+```
+
+Sets a fallback function that is called when the operation fails. The fallback receives the original error and may return `nil` to suppress it or a different error.
+
+```go
+g.Add("fetch", fetchData,
+    gofuncy.WithFallback(func(ctx context.Context, err error) error {
+        return loadFromCache(ctx)
+    }),
+)
+```
+
+### Resilience Chain Order
+
+The framework applies resilience options in a fixed order, regardless of the order they appear in your code:
+
+| Position | Middleware | Behavior |
+|----------|-----------|----------|
+| Innermost | **Timeout** | Each invocation gets a fresh deadline |
+| ↑ | **Retry** | Retries the timeout-wrapped function |
+| ↑ | **Circuit Breaker** | Sees the final outcome after all retries |
+| Outermost | **Fallback** | Last resort — catches everything |
+
+For custom ordering, use `WithMiddleware` with the middleware constructors (`Retry()`, `Fallback()`, etc.) directly.
 
 ## Shared Options
 
@@ -33,21 +118,13 @@ func WithLogger(l *slog.Logger) baseOpt
 
 Configures the logger for error reporting and stall detection warnings.
 
-### WithTimeout
-
-```go
-func WithTimeout(timeout time.Duration) baseOpt
-```
-
-Sets a timeout for the operation. Applies `context.WithTimeout` to the execution context. The goroutine's context is cancelled when the timeout elapses.
-
 ### WithMiddleware
 
 ```go
 func WithMiddleware(m ...Middleware) baseOpt
 ```
 
-Appends middleware to the operation's middleware chain. Middlewares wrap the function and execute from outermost to innermost.
+Appends middleware to the operation's middleware chain. User middlewares are applied **after** the built-in resilience chain (timeout, retry, circuit breaker, fallback) and **before** telemetry.
 
 ```go
 type Middleware func(Func) Func
@@ -146,7 +223,7 @@ Sets a custom OpenTelemetry tracer provider. Defaults to `otel.GetTracerProvider
 
 ## Go-Only Options
 
-These options implement only `GoOption` and are accepted by `Go` and `Group.Add`.
+These options implement only `GoOption` and are accepted by `Do`, `Start`, `Go`, and `Group.Add`.
 
 ### WithErrorHandler
 
@@ -170,7 +247,7 @@ Sets the caller skip for error reporting in traces. Adjusts the stack depth for 
 
 ## Group-Only Options
 
-These options implement only `GroupOption` and are accepted by `NewGroup` (and therefore `ForEach` and `Map`).
+These options implement only `GroupOption` and are accepted by `NewGroup` (and therefore `All` and `Map`).
 
 ### WithLimit
 
@@ -202,6 +279,9 @@ When no options are passed, the following defaults apply:
 | Error handler (`Go` only) | `slog.ErrorContext` |
 | Limit | No limit |
 | Fail-fast | Disabled |
+| Retry | Disabled |
+| Circuit breaker | Disabled |
+| Fallback | Disabled |
 
 ## Option Merging in Group.Add
 
@@ -215,6 +295,8 @@ When you pass options to `Group.Add`, they are merged on top of the group's opti
 | `bool` (metrics/tracing) | OR (enable, never disable) |
 | `MeterProvider` / `TracerProvider` | Override if non-nil |
 | `*semaphore.Weighted` | Override if non-nil |
+| `*CircuitBreaker` | Override if non-nil |
+| Retry / Fallback | Override if set |
 | `limit`, `failFast` | Not merged (group-only) |
 
 Note: The `name` parameter passed to `Add` always takes precedence over the group name.

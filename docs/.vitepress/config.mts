@@ -6,7 +6,7 @@ export default defineConfig({
 	description: 'Structured concurrency primitives for Go',
 	lang: "en-US",
 	lastUpdated: true,
-	appearance: "force-dark",
+	appearance: "dark",
 	ignoreDeadLinks: true,
 	base: '/gofuncy/',
 	sitemap: {
@@ -34,10 +34,18 @@ export default defineConfig({
 				text: 'API Reference',
 				items: [
 					{ text: 'Go', link: '/api/go' },
+					{ text: 'Start', link: '/api/start' },
+					{ text: 'Do', link: '/api/do' },
 					{ text: 'Group', link: '/api/group' },
-					{ text: 'ForEach', link: '/api/foreach' },
+					{ text: 'All', link: '/api/all' },
 					{ text: 'Map', link: '/api/map' },
 					{ text: 'Options', link: '/api/options' },
+				],
+			},
+			{
+				text: 'Packages',
+				items: [
+					{ text: 'Channel', link: '/api/channel' },
 				],
 			},
 			{
@@ -83,8 +91,8 @@ export default defineConfig({
 	markdown: {
 		// https://github.com/vuejs/vitepress/discussions/3724
 		theme: {
-			dark: 'github-dark',
-			light: 'github-light',
+			light: 'catppuccin-latte',
+			dark: 'catppuccin-frappe',
 		}
 	},
 	head: [

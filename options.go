@@ -1,6 +1,7 @@
 package gofuncy
 
 import (
+	"context"
 	"log/slog"
 	"time"
 
@@ -59,6 +60,12 @@ type options struct {
 	errorCounter        bool
 	activeUpDownCounter bool
 	durationHistogram   bool
+	// resilience
+	retryAttempts  int
+	retryOpts      []RetryOption
+	circuitBreaker *CircuitBreaker
+	fallbackFn     func(context.Context, error) error
+	fallbackOpts   []FallbackOption
 	// middleware
 	middlewares []Middleware
 	// telemetry providers
@@ -132,6 +139,20 @@ func (o options) merge(override options) options {
 
 	if override.limiter != nil {
 		o.limiter = override.limiter
+	}
+
+	if override.retryAttempts > 0 {
+		o.retryAttempts = override.retryAttempts
+		o.retryOpts = override.retryOpts
+	}
+
+	if override.circuitBreaker != nil {
+		o.circuitBreaker = override.circuitBreaker
+	}
+
+	if override.fallbackFn != nil {
+		o.fallbackFn = override.fallbackFn
+		o.fallbackOpts = override.fallbackOpts
 	}
 
 	return o
@@ -279,10 +300,39 @@ func WithStallHandler(h StallHandler) baseOpt {
 	}
 }
 
-// WithTimeout sets a timeout for the operation.
+// WithTimeout sets a per-invocation timeout. When combined with WithRetry,
+// each retry attempt gets its own fresh deadline.
 func WithTimeout(timeout time.Duration) baseOpt {
 	return func(o *options) {
 		o.timeout = timeout
+	}
+}
+
+// WithRetry configures automatic retry with the given maximum attempts.
+// maxAttempts is the total number of attempts (1 = no retry, 3 = initial + 2 retries).
+func WithRetry(maxAttempts int, opts ...RetryOption) baseOpt {
+	return func(o *options) {
+		o.retryAttempts = maxAttempts
+		o.retryOpts = opts
+	}
+}
+
+// WithCircuitBreaker sets a circuit breaker for the operation. The circuit
+// breaker is stateful — create one via NewCircuitBreaker and share it across
+// all calls to the same dependency.
+func WithCircuitBreaker(cb *CircuitBreaker) baseOpt {
+	return func(o *options) {
+		o.circuitBreaker = cb
+	}
+}
+
+// WithFallback sets a fallback function that is called when the operation fails.
+// The fallback receives the original error and may return nil to suppress it or
+// a different error.
+func WithFallback(fn func(ctx context.Context, err error) error, opts ...FallbackOption) baseOpt {
+	return func(o *options) {
+		o.fallbackFn = fn
+		o.fallbackOpts = opts
 	}
 }
 

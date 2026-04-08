@@ -67,47 +67,10 @@ func (g *Group) Add(name string, fn Func, opts ...GoOption) {
 	if len(opts) > 0 {
 		o = o.merge(newGoOverrideOptions(opts))
 	}
+
 	o.name = name
 
-	// build middleware chain (innermost → outermost)
-	run := fn
-	run = withRecover(run)
-
-	for _, m := range o.middlewares {
-		run = m(run)
-	}
-
-	if o.startedCounter || o.errorCounter || o.activeUpDownCounter || o.durationHistogram {
-		m := o.meter()
-
-		if o.startedCounter {
-			run = withStartedCounter(run, m, o.name)
-		}
-
-		if o.errorCounter {
-			run = withErrorCounter(run, m, o.name)
-		}
-
-		if o.activeUpDownCounter {
-			run = withActiveUpDownCounter(run, m, o.name)
-		}
-
-		if o.durationHistogram {
-			run = withDurationHistogram(run, m, o.name)
-		}
-	}
-
-	if o.tracing {
-		run = withTracing(run, &o, "gofuncy.group.add", 2)
-	}
-
-	if o.stallThreshold > 0 {
-		run = withStallDetector(run, o.stallThreshold, o.stallHandler, o.meter(), o.l, o.name)
-	}
-
-	if o.timeout > 0 {
-		run = withTimeout(run, o.timeout)
-	}
+	run := buildChain(fn, &o, "gofuncy.group.add", 3)
 
 	g.mu.Lock()
 	idx := len(g.errs)

@@ -1,10 +1,10 @@
 ---
 prev:
-  text: Go
-  link: /api/go
+  text: Do
+  link: /api/do
 next:
-  text: ForEach
-  link: /api/foreach
+  text: All
+  link: /api/all
 ---
 
 # Group

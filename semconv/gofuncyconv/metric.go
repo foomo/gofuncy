@@ -20,6 +20,11 @@ const (
 	goroutinesErrorsName = "gofuncy.goroutines.errors"
 	goroutinesErrorsDesc = "Total number of goroutine errors"
 
+	goroutinesRetriesName  = "gofuncy.goroutines.retries"
+	goroutinesRetriesDesc  = "Total number of retry attempts"
+	goroutinesRejectedName = "gofuncy.goroutines.circuitbreaker.rejected"
+	goroutinesRejectedDesc = "Total number of requests rejected by a circuit breaker"
+
 	goroutinesStalledName = "gofuncy.goroutines.stalled"
 	goroutinesStalledDesc = "Total number of goroutines that exceeded their stall threshold"
 
@@ -35,8 +40,8 @@ const (
 	chansCurrentName = "gofuncy.chans.current"
 	chansCurrentDesc = "Gofuncy open chan up/down count"
 
-	messagesCurrentName = "gofuncy.messages.current"
-	messagesCurrentDesc = "Gofuncy pending message count"
+	messagesSentName = "gofuncy.messages.sent"
+	messagesSentDesc = "Total number of messages sent"
 
 	messagesDurationName = "gofuncy.messages.duration.seconds"
 	messagesDurationDesc = "Gofuncy chan message send duration"
@@ -61,6 +66,7 @@ type GoroutinesStarted struct {
 	inst metric.Int64Counter
 }
 
+// NewGoroutinesStarted creates a new goroutines started counter.
 func NewGoroutinesStarted(m metric.Meter) (GoroutinesStarted, error) {
 	if m == nil {
 		return GoroutinesStarted{}, nil
@@ -84,6 +90,11 @@ func (g GoroutinesStarted) Add(ctx context.Context, incr int64, routineName stri
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
 	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
@@ -96,6 +107,7 @@ type GoroutinesErrors struct {
 	inst metric.Int64Counter
 }
 
+// NewGoroutinesErrors creates a new goroutine errors counter.
 func NewGoroutinesErrors(m metric.Meter) (GoroutinesErrors, error) {
 	if m == nil {
 		return GoroutinesErrors{}, nil
@@ -119,6 +131,93 @@ func (g GoroutinesErrors) Add(ctx context.Context, incr int64, routineName strin
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ GoroutinesRetries
+// ------------------------------------------------------------------------------------------------
+
+// GoroutinesRetries counts the total number of retry attempts.
+type GoroutinesRetries struct {
+	inst metric.Int64Counter
+}
+
+// NewGoroutinesRetries creates a new retry attempts counter.
+func NewGoroutinesRetries(m metric.Meter) (GoroutinesRetries, error) {
+	if m == nil {
+		return GoroutinesRetries{}, nil
+	}
+
+	c, err := m.Int64Counter(goroutinesRetriesName,
+		metric.WithDescription(goroutinesRetriesDesc),
+		metric.WithUnit(unitGoroutine),
+	)
+
+	return GoroutinesRetries{inst: c}, err
+}
+
+func (GoroutinesRetries) Name() string                { return goroutinesRetriesName }
+func (GoroutinesRetries) Unit() string                { return unitGoroutine }
+func (GoroutinesRetries) Description() string         { return goroutinesRetriesDesc }
+func (g GoroutinesRetries) Inst() metric.Int64Counter { return g.inst }
+
+func (g GoroutinesRetries) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+	if g.inst == nil {
+		return
+	}
+
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
+	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
+}
+
+// ------------------------------------------------------------------------------------------------
+// ~ GoroutinesRejected
+// ------------------------------------------------------------------------------------------------
+
+// GoroutinesRejected counts requests rejected by a circuit breaker.
+type GoroutinesRejected struct {
+	inst metric.Int64Counter
+}
+
+// NewGoroutinesRejected creates a new circuit breaker rejections counter.
+func NewGoroutinesRejected(m metric.Meter) (GoroutinesRejected, error) {
+	if m == nil {
+		return GoroutinesRejected{}, nil
+	}
+
+	c, err := m.Int64Counter(goroutinesRejectedName,
+		metric.WithDescription(goroutinesRejectedDesc),
+		metric.WithUnit(unitGoroutine),
+	)
+
+	return GoroutinesRejected{inst: c}, err
+}
+
+func (GoroutinesRejected) Name() string                { return goroutinesRejectedName }
+func (GoroutinesRejected) Unit() string                { return unitGoroutine }
+func (GoroutinesRejected) Description() string         { return goroutinesRejectedDesc }
+func (g GoroutinesRejected) Inst() metric.Int64Counter { return g.inst }
+
+func (g GoroutinesRejected) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
+	if g.inst == nil {
+		return
+	}
+
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
 	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
@@ -131,6 +230,7 @@ type GoroutinesStalled struct {
 	inst metric.Int64Counter
 }
 
+// NewGoroutinesStalled creates a new stalled goroutines counter.
 func NewGoroutinesStalled(m metric.Meter) (GoroutinesStalled, error) {
 	if m == nil {
 		return GoroutinesStalled{}, nil
@@ -154,6 +254,11 @@ func (g GoroutinesStalled) Add(ctx context.Context, incr int64, routineName stri
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
 	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
@@ -166,6 +271,7 @@ type GoroutinesActive struct {
 	inst metric.Int64UpDownCounter
 }
 
+// NewGoroutinesActive creates a new active goroutines up-down counter.
 func NewGoroutinesActive(m metric.Meter) (GoroutinesActive, error) {
 	if m == nil {
 		return GoroutinesActive{}, nil
@@ -189,6 +295,11 @@ func (g GoroutinesActive) Add(ctx context.Context, incr int64, routineName strin
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.RoutineName(routineName)))
+		return
+	}
+
 	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.RoutineName(routineName))...))
 }
 
@@ -201,6 +312,7 @@ type GoroutinesDuration struct {
 	inst metric.Float64Histogram
 }
 
+// NewGoroutinesDuration creates a new goroutine duration histogram.
 func NewGoroutinesDuration(m metric.Meter) (GoroutinesDuration, error) {
 	if m == nil {
 		return GoroutinesDuration{}, nil
@@ -225,6 +337,15 @@ func (g GoroutinesDuration) Record(ctx context.Context, value float64, routineNa
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Record(ctx, value, metric.WithAttributes(
+			semconv.RoutineName(routineName),
+			semconv.Error(hasError),
+		))
+
+		return
+	}
+
 	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs,
 		semconv.RoutineName(routineName),
 		semconv.Error(hasError),
@@ -240,6 +361,7 @@ type GroupsDuration struct {
 	inst metric.Float64Histogram
 }
 
+// NewGroupsDuration creates a new group duration histogram.
 func NewGroupsDuration(m metric.Meter) (GroupsDuration, error) {
 	if m == nil {
 		return GroupsDuration{}, nil
@@ -264,6 +386,15 @@ func (g GroupsDuration) Record(ctx context.Context, value float64, routineName s
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Record(ctx, value, metric.WithAttributes(
+			semconv.RoutineName(routineName),
+			semconv.Error(hasError),
+		))
+
+		return
+	}
+
 	g.inst.Record(ctx, value, metric.WithAttributes(append(attrs,
 		semconv.RoutineName(routineName),
 		semconv.Error(hasError),
@@ -279,6 +410,7 @@ type ChansCurrent struct {
 	inst metric.Int64UpDownCounter
 }
 
+// NewChansCurrent creates a new open channels up-down counter.
 func NewChansCurrent(m metric.Meter) (ChansCurrent, error) {
 	if m == nil {
 		return ChansCurrent{}, nil
@@ -302,38 +434,49 @@ func (g ChansCurrent) Add(ctx context.Context, incr int64, chanName string, attr
 		return
 	}
 
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.ChanName(chanName)))
+		return
+	}
+
 	g.inst.Add(ctx, incr, metric.WithAttributes(append(attrs, semconv.ChanName(chanName))...))
 }
 
 // ------------------------------------------------------------------------------------------------
-// ~ MessagesCurrent
+// ~ MessagesSent
 // ------------------------------------------------------------------------------------------------
 
-// MessagesCurrent tracks the current number of pending messages.
-type MessagesCurrent struct {
-	inst metric.Int64UpDownCounter
+// MessagesSent counts the total number of messages sent.
+type MessagesSent struct {
+	inst metric.Int64Counter
 }
 
-func NewMessagesCurrent(m metric.Meter) (MessagesCurrent, error) {
+// NewMessagesSent creates a new messages sent counter.
+func NewMessagesSent(m metric.Meter) (MessagesSent, error) {
 	if m == nil {
-		return MessagesCurrent{}, nil
+		return MessagesSent{}, nil
 	}
 
-	c, err := m.Int64UpDownCounter(messagesCurrentName,
-		metric.WithDescription(messagesCurrentDesc),
+	c, err := m.Int64Counter(messagesSentName,
+		metric.WithDescription(messagesSentDesc),
 		metric.WithUnit(unitMessage),
 	)
 
-	return MessagesCurrent{inst: c}, err
+	return MessagesSent{inst: c}, err
 }
 
-func (MessagesCurrent) Name() string                      { return messagesCurrentName }
-func (MessagesCurrent) Unit() string                      { return unitMessage }
-func (MessagesCurrent) Description() string               { return messagesCurrentDesc }
-func (g MessagesCurrent) Inst() metric.Int64UpDownCounter { return g.inst }
+func (MessagesSent) Name() string                { return messagesSentName }
+func (MessagesSent) Unit() string                { return unitMessage }
+func (MessagesSent) Description() string         { return messagesSentDesc }
+func (g MessagesSent) Inst() metric.Int64Counter { return g.inst }
 
-func (g MessagesCurrent) Add(ctx context.Context, incr int64, chanName string, attrs ...attribute.KeyValue) {
+func (g MessagesSent) Add(ctx context.Context, incr int64, chanName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
+		return
+	}
+
+	if len(attrs) == 0 {
+		g.inst.Add(ctx, incr, metric.WithAttributes(semconv.ChanName(chanName)))
 		return
 	}
 
@@ -349,6 +492,7 @@ type MessagesDuration struct {
 	inst metric.Float64Histogram
 }
 
+// NewMessagesDuration creates a new message send duration histogram.
 func NewMessagesDuration(m metric.Meter) (MessagesDuration, error) {
 	if m == nil {
 		return MessagesDuration{}, nil
@@ -370,6 +514,11 @@ func (g MessagesDuration) Inst() metric.Float64Histogram { return g.inst }
 
 func (g MessagesDuration) Record(ctx context.Context, value float64, chanName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
+		return
+	}
+
+	if len(attrs) == 0 {
+		g.inst.Record(ctx, value, metric.WithAttributes(semconv.ChanName(chanName)))
 		return
 	}
 

@@ -90,12 +90,12 @@ func main() {
 	var orders []string
 
 	// Launch two async calls
-	waitUser := gofuncy.Start(ctx, "fetch-user", func(ctx context.Context) error {
+	waitUser := gofuncy.Wait(ctx, "fetch-user", func(ctx context.Context) error {
 		user = "Alice"
 		return nil
 	})
 
-	waitOrders := gofuncy.Start(ctx, "fetch-orders", func(ctx context.Context) error {
+	waitOrders := gofuncy.Wait(ctx, "fetch-orders", func(ctx context.Context) error {
 		orders = []string{"order-1", "order-2"}
 		return nil
 	})

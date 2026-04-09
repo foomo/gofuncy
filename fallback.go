@@ -15,7 +15,8 @@ type fallbackConfig struct {
 // Fallback returns a Middleware that calls fn when the wrapped function returns
 // an error, allowing graceful degradation. The fallback function receives the
 // original context and error, and may return nil to suppress the error or a
-// different error.
+// different error. By default, context errors and panics bypass the fallback;
+// use FallbackIf to customize which errors trigger it.
 func Fallback(fn func(ctx context.Context, err error) error, opts ...FallbackOption) Middleware {
 	cfg := fallbackConfig{
 		fallbackIf: defaultFallbackIf,

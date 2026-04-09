@@ -12,6 +12,59 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleDo() {
+	err := gofuncy.Do(context.Background(), "greet", func(ctx context.Context) error {
+		fmt.Println("hello")
+		return nil
+	})
+
+	fmt.Println("error:", err)
+	// Output:
+	// hello
+	// error: <nil>
+}
+
+func ExampleDo_retry() {
+	var attempts atomic.Int32
+
+	err := gofuncy.Do(context.Background(), "flaky-call",
+		func(ctx context.Context) error {
+			n := attempts.Add(1)
+			if n < 3 {
+				return fmt.Errorf("attempt %d failed", n)
+			}
+
+			fmt.Println("succeeded on attempt", n)
+
+			return nil
+		},
+		gofuncy.WithRetry(5),
+		gofuncy.WithTimeout(time.Second),
+	)
+
+	fmt.Println("error:", err)
+	// Output:
+	// succeeded on attempt 3
+	// error: <nil>
+}
+
+func ExampleDo_fallback() {
+	err := gofuncy.Do(context.Background(), "with-fallback",
+		func(ctx context.Context) error {
+			return fmt.Errorf("primary failed")
+		},
+		gofuncy.WithFallback(func(ctx context.Context, err error) error {
+			fmt.Println("fallback called:", err)
+			return nil // suppress the error
+		}),
+	)
+
+	fmt.Println("error:", err)
+	// Output:
+	// fallback called: primary failed
+	// error: <nil>
+}
+
 func TestDo_success(t *testing.T) {
 	t.Parallel()
 

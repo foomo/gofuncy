@@ -1,7 +1,7 @@
 ---
 prev:
-  text: Start
-  link: /api/start
+  text: Wait
+  link: /api/wait
 next:
   text: Group
   link: /api/group
@@ -41,9 +41,9 @@ See the full [Options reference](/api/options).
 3. The function runs **synchronously** on the calling goroutine.
 4. The error is returned directly to the caller.
 
-## Do vs Start vs Go
+## Do vs Wait vs Go
 
-| | `Do` | `Start` | `Go` |
+| | `Do` | `Wait` | `Go` |
 |---|---|---|---|
 | **Execution** | Synchronous | Async — returns wait function | Async — fire-and-forget |
 | **Error handling** | Returns `error` | Wait function returns `error` | `ErrorHandler` callback |

@@ -6,6 +6,11 @@ import (
 	"math"
 	"math/rand/v2"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+
+	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
 
 // Backoff returns the delay before the nth retry attempt (0-indexed).
@@ -18,6 +23,8 @@ type retryConfig struct {
 	backoff func(attempt int) time.Duration
 	retryIf func(error) bool
 	onRetry func(ctx context.Context, attempt int, err error)
+	meter   metric.Meter
+	name    string
 }
 
 // Retry returns a Middleware that retries the wrapped function up to
@@ -33,6 +40,11 @@ func Retry(maxAttempts int, opts ...RetryOption) Middleware {
 	}
 	for _, opt := range opts {
 		opt(&cfg)
+	}
+
+	retries, err := gofuncyconv.NewGoroutinesRetries(cfg.meter)
+	if err != nil {
+		otel.Handle(err)
 	}
 
 	return func(fn Func) Func {
@@ -52,15 +64,20 @@ func Retry(maxAttempts int, opts ...RetryOption) Middleware {
 					break
 				}
 
+				retries.Add(ctx, 1, cfg.name)
+
 				if cfg.onRetry != nil {
 					cfg.onRetry(ctx, attempt+1, err)
 				}
 
 				delay := cfg.backoff(attempt)
+
+				t := time.NewTimer(delay)
 				select {
 				case <-ctx.Done():
+					t.Stop()
 					return ctx.Err()
-				case <-time.After(delay):
+				case <-t.C:
 				}
 			}
 
@@ -111,6 +128,13 @@ func BackoffExponential(initial time.Duration, multiplier float64, maxDelay time
 		delay = delay - jitter + rand.Float64()*2*jitter //nolint:gosec
 
 		return time.Duration(delay)
+	}
+}
+
+func retryWithMeter(m metric.Meter, name string) RetryOption {
+	return func(c *retryConfig) {
+		c.meter = m
+		c.name = name
 	}
 }
 

@@ -49,7 +49,7 @@ func New[T any](name string, opts ...Option[T]) *Channel[T]
 | Tracer provider | OTel global | `WithTracerProvider[T](tp)` |
 
 ::: tip
-Counters are cheap and enabled by default. Duration histogram and tracing are opt-in because they add overhead on every `Send` call. This matches the convention used by `Go`, `Do`, `Start`, and `Group`.
+Counters are cheap and enabled by default. Duration histogram and tracing are opt-in because they add overhead on every `Send` call. This matches the convention used by `Go`, `Do`, `Wait`, and `Group`.
 :::
 
 ## Behavior

@@ -46,7 +46,7 @@ func (f groupOnlyOpt) applyGroup(o *options) { f(o) }
 // ~ Options struct
 // ------------------------------------------------------------------------------------------------
 
-type options struct {
+type options struct { //nolint:recvcheck
 	l              *slog.Logger
 	name           string
 	timeout        time.Duration
@@ -78,7 +78,9 @@ type options struct {
 	failFast bool
 }
 
-func (o options) meter() metric.Meter {
+// meter returns the OTel Meter for this scope. The OTel SDK caches both Meter
+// instances and instrument handles internally, so repeated calls are cheap.
+func (o *options) meter() metric.Meter {
 	mp := o.meterProvider
 	if mp == nil {
 		mp = otel.GetMeterProvider()
@@ -87,7 +89,9 @@ func (o options) meter() metric.Meter {
 	return mp.Meter(ScopeName, metric.WithSchemaURL(otelsemconv.SchemaURL))
 }
 
-func (o options) tracer() trace.Tracer {
+// tracer returns the OTel Tracer for this scope. The OTel SDK caches Tracer
+// instances internally, so repeated calls are cheap.
+func (o *options) tracer() trace.Tracer {
 	tp := o.tracerProvider
 	if tp == nil {
 		tp = otel.GetTracerProvider()

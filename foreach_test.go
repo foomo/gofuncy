@@ -13,6 +13,24 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleAll() {
+	urls := []string{"https://a.test", "https://b.test", "https://c.test"}
+
+	err := gofuncy.All(context.Background(), "fetch", urls,
+		func(ctx context.Context, url string) error {
+			fmt.Println("fetching", url)
+			return nil
+		},
+	)
+
+	fmt.Println("error:", err)
+	// Unordered output:
+	// fetching https://a.test
+	// fetching https://b.test
+	// fetching https://c.test
+	// error: <nil>
+}
+
 func TestAll_basic(t *testing.T) {
 	t.Parallel()
 

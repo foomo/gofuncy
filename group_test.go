@@ -41,6 +41,29 @@ func ExampleNewGroup() {
 	// b
 }
 
+func ExampleNewGroup_failFast() {
+	g := gofuncy.NewGroup(context.Background(), "tasks",
+		gofuncy.WithFailFast(),
+		gofuncy.WithLimit(2),
+	)
+
+	g.Add("ok", func(ctx context.Context) error {
+		fmt.Println("ok")
+		return nil
+	})
+	g.Add("fail", func(ctx context.Context) error {
+		return fmt.Errorf("something went wrong")
+	})
+
+	if err := g.Wait(); err != nil {
+		fmt.Println("group error:", err)
+	}
+
+	// Unordered output:
+	// ok
+	// group error: something went wrong
+}
+
 func TestGroup_basic(t *testing.T) {
 	t.Parallel()
 

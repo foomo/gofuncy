@@ -7,14 +7,14 @@ next:
   link: /api/do
 ---
 
-# Start
+# Wait
 
 Spawns a goroutine with the full middleware chain and returns a wait function for deferred result collection.
 
 ## Signature
 
 ```go
-func Start(ctx context.Context, name string, fn Func, opts ...GoOption) func() error
+func Wait(ctx context.Context, name string, fn Func, opts ...GoOption) func() error
 ```
 
 ### Parameters
@@ -43,9 +43,9 @@ See the full [Options reference](/api/options).
 5. Calling the wait function blocks until the goroutine completes and returns its error.
 6. The wait function is safe to call multiple times and from multiple goroutines — it always returns the same result.
 
-## Do vs Start vs Go
+## Do vs Wait vs Go
 
-| | `Do` | `Start` | `Go` |
+| | `Do` | `Wait` | `Go` |
 |---|---|---|---|
 | **Execution** | Synchronous | Async — returns wait function | Async — fire-and-forget |
 | **Error handling** | Returns `error` | Wait function returns `error` | `ErrorHandler` callback |
@@ -55,12 +55,12 @@ See the full [Options reference](/api/options).
 
 ```go
 // Launch two async calls
-waitUser := gofuncy.Start(ctx, "fetch-user", func(ctx context.Context) error {
+waitUser := gofuncy.Wait(ctx, "fetch-user", func(ctx context.Context) error {
     user, err = api.GetUser(ctx, userID)
     return err
 }, gofuncy.WithRetry(3))
 
-waitOrders := gofuncy.Start(ctx, "fetch-orders", func(ctx context.Context) error {
+waitOrders := gofuncy.Wait(ctx, "fetch-orders", func(ctx context.Context) error {
     orders, err = api.GetOrders(ctx, userID)
     return err
 }, gofuncy.WithRetry(3))

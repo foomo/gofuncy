@@ -12,6 +12,22 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func ExampleMap() {
+	items := []int{1, 2, 3, 4, 5}
+
+	results, err := gofuncy.Map(context.Background(), "double", items,
+		func(ctx context.Context, n int) (int, error) {
+			return n * 2, nil
+		},
+	)
+
+	fmt.Println("results:", results)
+	fmt.Println("error:", err)
+	// Output:
+	// results: [2 4 6 8 10]
+	// error: <nil>
+}
+
 func TestMap_basic(t *testing.T) {
 	t.Parallel()
 

@@ -16,8 +16,8 @@ All options are configured via functional option constructors. Options fall into
 
 | Category | Interface | Accepted by |
 |----------|-----------|-------------|
-| Shared | `GoOption` + `GroupOption` | `Do`, `Start`, `Go`, `NewGroup`, `Group.Add` |
-| Go-only | `GoOption` | `Do`, `Start`, `Go`, `Group.Add` |
+| Shared | `GoOption` + `GroupOption` | `Do`, `Wait`, `Go`, `NewGroup`, `Group.Add` |
+| Go-only | `GoOption` | `Do`, `Wait`, `Go`, `Group.Add` |
 | Group-only | `GroupOption` | `NewGroup`, `All`, `Map` |
 
 The compiler enforces these constraints. You cannot pass a `groupOnlyOpt` to `Go()` or a `goOnlyOpt` to `NewGroup()`.
@@ -223,7 +223,7 @@ Sets a custom OpenTelemetry tracer provider. Defaults to `otel.GetTracerProvider
 
 ## Go-Only Options
 
-These options implement only `GoOption` and are accepted by `Do`, `Start`, `Go`, and `Group.Add`.
+These options implement only `GoOption` and are accepted by `Do`, `Wait`, `Go`, and `Group.Add`.
 
 ### WithErrorHandler
 

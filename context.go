@@ -6,6 +6,8 @@ import (
 
 type contextKey int
 
+// Context wraps a standard context with helper methods for accessing
+// gofuncy routine name and parent information.
 type Context struct {
 	context.Context //nolint:containedctx
 }
@@ -29,7 +31,7 @@ type routineInfo struct {
 	parent string
 }
 
-// Ctx helper
+// Ctx wraps a context.Context with gofuncy helper methods.
 func Ctx(ctx context.Context) Context {
 	return Context{Context: ctx}
 }
@@ -67,6 +69,7 @@ func injectParentIntoContext(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, contextKeyParent, name)
 }
 
+// ParentFromContext extracts the parent routine name from the given context.
 func ParentFromContext(ctx context.Context) string {
 	// check combined key first
 	if ri, ok := ctx.Value(contextKeyRoutine).(routineInfo); ok {

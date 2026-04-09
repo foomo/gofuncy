@@ -34,7 +34,7 @@ export default defineConfig({
 				text: 'API Reference',
 				items: [
 					{ text: 'Go', link: '/api/go' },
-					{ text: 'Start', link: '/api/start' },
+					{ text: 'Wait', link: '/api/wait' },
 					{ text: 'Do', link: '/api/do' },
 					{ text: 'Group', link: '/api/group' },
 					{ text: 'All', link: '/api/all' },

@@ -10,153 +10,118 @@
 
 > Stop using `go func`, start using `gofuncy`!
 
-- ctx as a first class citizen
-- error return as a first class citizen
-- optional: enable telemetry (metrics & traces)
-  - `gofuncy.routine.count` counter
-  - `gofuncy.routine.duration` histogram
-  - `gofuncy.channel.sent.count` counter
-  - `gofuncy.channel.sent.duration` histogram
+Context-aware, observable goroutine management with built-in resilience patterns.
 
-## Configuration
+## Features
 
-Environment variables:
+- Context propagation with routine name and parent chain
+- Automatic panic recovery
+- Built-in telemetry (metrics and tracing via OpenTelemetry)
+- Resilience: retry with exponential backoff, circuit breaker, fallback
+- Concurrency control via semaphores and group limits
+- Stall detection
 
-- `OTEL_ENABLED`: enable telemetry
-- `GOFUNCY_CHANNEL_VALUE_EVENTS_ENABLED`: creates a span event for every value sent into the channel
-- `GOFUNCY_CHANNEL_VALUE_ATTRIBUTE_ENABLED`: adds the json dump of the data to the span event
+## Installation
 
-## Usage
-
-From:
-
-```go
-package main
-
-func main() {
-  go func() {
-    numbers, err := GenerateNumbers(5)
-    if err != nil {
-      panic(err)
-    }
-  }()
-}
+```bash
+go get github.com/foomo/gofuncy
 ```
 
-To:
+## Quick Start
 
 ```go
-package main
+ctx := gofuncy.Ctx(context.Background()).Root()
 
-import (
-  "github.com/foomo/gofuncy"
-)
-
-func main() {
-  errChan := gofuncy.Go(func(ctx context.Context) error {
-    numbers, err := GenerateNumbers(5)
-    return err
-  })
-  if err := <-errChan; err != nil {
-    panic(err)
-  }
-}
-```
-
-## Concept
-
-### Routines
-
-#### Error
-
-Each routine can return an error that is being returned through an error channel:
-
-```go
-errChan := gofuncy.Go(func (ctx context.Context) error {
-return nil
+// Fire-and-forget goroutine
+gofuncy.Go(ctx, "worker", func(ctx context.Context) error {
+    // gofuncy.Ctx(ctx).Name() == "worker"
+    return doWork(ctx)
 })
 
-if err := <- errChan; err != nil {
-panic(err)
+// Synchronous execution with middleware chain
+err := gofuncy.Do(ctx, "fetch", fetchData)
+
+// Goroutine with wait
+wait := gofuncy.Wait(ctx, "processor", processItems)
+// ... do other work ...
+err := wait()
+```
+
+## Core API
+
+Every function wraps a `gofuncy.Func`:
+
+```go
+type Func func(ctx context.Context) error
+```
+
+| Function | Description |
+|----------|-------------|
+| `Go(ctx, name, fn, ...GoOption)` | Fire-and-forget goroutine with error logging |
+| `Do(ctx, name, fn, ...GoOption)` | Synchronous execution, returns error directly |
+| `Wait(ctx, name, fn, ...GoOption)` | Goroutine that returns a wait function |
+| `NewGroup(ctx, name, ...GroupOption)` | Concurrent group with shared lifecycle |
+| `All(ctx, name, items, fn, ...GroupOption)` | Execute fn for each item concurrently |
+| `Map(ctx, name, items, fn, ...GroupOption)` | Transform items concurrently, preserving order |
+
+## Options
+
+```go
+// Resilience
+gofuncy.WithTimeout(5 * time.Second)
+gofuncy.WithRetry(3)
+gofuncy.WithCircuitBreaker(cb)
+gofuncy.WithFallback(fallbackFn)
+
+// Concurrency
+gofuncy.WithLimit(10)      // Group only
+gofuncy.WithLimiter(sem)   // Shared semaphore
+
+// Telemetry (on by default, opt-out)
+gofuncy.WithoutTracing()
+gofuncy.WithoutStartedCounter()
+gofuncy.WithoutErrorCounter()
+gofuncy.WithoutActiveUpDownCounter()
+gofuncy.WithDurationHistogram() // opt-in
+```
+
+## Telemetry
+
+Metrics (all via OpenTelemetry):
+
+| Name | Type | Default |
+|------|------|---------|
+| `gofuncy.goroutines.started` | Counter | on |
+| `gofuncy.goroutines.errors` | Counter | on |
+| `gofuncy.goroutines.active` | UpDownCounter | on |
+| `gofuncy.goroutines.stalled` | Counter | on |
+| `gofuncy.goroutines.duration.seconds` | Histogram | off |
+| `gofuncy.groups.duration.seconds` | Histogram | off |
+
+## Channel
+
+The `channel` subpackage provides a generic, observable channel:
+
+```go
+import "github.com/foomo/gofuncy/channel"
+
+ch := channel.New[string]("events", channel.WithBuffer[string](100))
+defer ch.Close()
+
+ch.Send(ctx, "hello", "world")
+
+for msg := range ch.Receive() {
+    fmt.Println(msg)
 }
 ```
 
-#### Context
+Channel metrics:
 
-Each routine will receive its own base context, which can be set:
-
-```go
-errChan := gofuncy.Go(send(msg), gofuncy.WithContext(context.Background()))
-```
-
-```mermaid
-flowchart TB
-  subgraph root
-    channel[Channel]
-    subgraph "Routine A"
-      ctxA[ctx] --> senderA
-      senderA[Sender]
-    end
-    subgraph "Routine B"
-      ctxB[ctx] --> senderB
-      senderB[Sender]
-    end
-    senderA --> channel
-    senderB --> channel
-    channel --> receiverC
-    subgraph "Routine C"
-      ctxC[ctx] --> receiverC
-      receiverC[Receiver]
-    end
-  end
-```
-
-#### Names
-
-Using the context we will inject a name for the process so that it can always be identified:
-
-```mermaid
-flowchart TB
-  subgraph root
-    channel[Channel]
-    subgraph "Routine A"
-      ctxA[ctx] -- ctx: sender - a --> senderA
-      senderA[Sender]
-    end
-    subgraph "Routine B"
-      ctxB[ctx] -- ctx: sender - b --> senderB
-      senderB[Sender]
-    end
-    senderA --> channel
-    senderB --> channel
-    channel --> receiverC
-    subgraph "Routine C"
-      ctxC[ctx] -- ctx: receiver - b --> receiverC
-      receiverC[Receiver]
-    end
-  end
-```
-
-#### Telemetry
-
-Metrics:
-
-| Name                       | Type          |
-|----------------------------|---------------|
-| `gofuncy.routine.count`    | UpDownCounter |
-| `gofuncy.routine.duration` | Histogram     |
-
-```mermaid
-flowchart TB
-  subgraph root
-    subgraph rA ["Routine A"]
-      handler[Handler]
-    end
-    rA -- gofuncy . routine . count --> Metrics
-    rA -- gofuncy . routine . duration --> Metrics
-    rA -- span: routine - a --> Trace
-  end
-```
+| Name | Type | Default |
+|------|------|---------|
+| `gofuncy.chans.current` | UpDownCounter | on |
+| `gofuncy.messages.sent` | Counter | on |
+| `gofuncy.messages.duration.seconds` | Histogram | off |
 
 ## How to Contribute
 

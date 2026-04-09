@@ -100,6 +100,66 @@ func BenchmarkGo_WithLimiter(b *testing.B) {
 	}
 }
 
+func BenchmarkDo_Default(b *testing.B) {
+	b.ReportAllocs()
+
+	noop := func(ctx context.Context) error { return nil }
+
+	for b.Loop() {
+		_ = gofuncy.Do(b.Context(), "bench-do", noop)
+	}
+}
+
+func BenchmarkDo_Minimal(b *testing.B) {
+	b.ReportAllocs()
+
+	noop := func(ctx context.Context) error { return nil }
+
+	for b.Loop() {
+		_ = gofuncy.Do(b.Context(), "bench-do", noop,
+			gofuncy.WithoutTracing(),
+			gofuncy.WithoutStartedCounter(),
+			gofuncy.WithoutErrorCounter(),
+			gofuncy.WithoutActiveUpDownCounter(),
+		)
+	}
+}
+
+func BenchmarkWait_Default(b *testing.B) {
+	b.ReportAllocs()
+
+	noop := func(ctx context.Context) error { return nil }
+
+	for b.Loop() {
+		wait := gofuncy.Wait(b.Context(), "bench-start", noop)
+		_ = wait()
+	}
+}
+
+func BenchmarkAll(b *testing.B) {
+	noTelemetry := []gofuncy.GroupOption{
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	}
+
+	items := make([]int, 100)
+	for i := range items {
+		items[i] = i
+	}
+
+	b.Run("size=100", func(b *testing.B) {
+		b.ReportAllocs()
+
+		for b.Loop() {
+			_ = gofuncy.All(b.Context(), "bench-all", items, func(ctx context.Context, item int) error {
+				return nil
+			}, noTelemetry...)
+		}
+	})
+}
+
 func BenchmarkGroupRaw(b *testing.B) {
 	b.ReportAllocs()
 

@@ -184,25 +184,24 @@ func TestChansCurrent_nilMeter(t *testing.T) {
 	m.Add(context.Background(), 1, "test-chan")
 }
 
-func TestMessagesCurrent(t *testing.T) {
+func TestMessagesSent(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewMessagesCurrent(noop.Meter{})
+	m, err := gofuncyconv.NewMessagesSent(noop.Meter{})
 	require.NoError(t, err)
 
-	assert.Equal(t, "gofuncy.messages.current", m.Name())
+	assert.Equal(t, "gofuncy.messages.sent", m.Name())
 	assert.Equal(t, "{message}", m.Unit())
-	assert.Equal(t, "Gofuncy pending message count", m.Description())
+	assert.Equal(t, "Total number of messages sent", m.Description())
 	assert.NotNil(t, m.Inst())
 
 	m.Add(context.Background(), 1, "test-chan")
-	m.Add(context.Background(), -1, "test-chan")
 }
 
-func TestMessagesCurrent_nilMeter(t *testing.T) {
+func TestMessagesSent_nilMeter(t *testing.T) {
 	t.Parallel()
 
-	m, err := gofuncyconv.NewMessagesCurrent(nil)
+	m, err := gofuncyconv.NewMessagesSent(nil)
 	require.NoError(t, err)
 
 	m.Add(context.Background(), 1, "test-chan")

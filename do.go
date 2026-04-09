@@ -7,6 +7,7 @@ import (
 // Do executes fn synchronously with the full middleware chain (resilience,
 // telemetry, tracing) and returns the error directly. Unlike Go, it does not
 // spawn a goroutine.
+// The name is used as a metric attribute — use static, low-cardinality values.
 func Do(ctx context.Context, name string, fn Func, opts ...GoOption) error {
 	o := newGoOptions(opts)
 	o.name = name

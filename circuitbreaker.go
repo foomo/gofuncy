@@ -6,6 +6,11 @@ import (
 	"fmt"
 	"sync"
 	"time"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+
+	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
 
 // ErrCircuitOpen is returned when the circuit breaker is open and not
@@ -76,7 +81,12 @@ func NewCircuitBreaker(opts ...CircuitBreakerOption) *CircuitBreaker {
 }
 
 // middleware returns a Middleware that implements the circuit breaker pattern.
-func (cb *CircuitBreaker) middleware() Middleware {
+func (cb *CircuitBreaker) middleware(m metric.Meter, name string) Middleware {
+	rejected, err := gofuncyconv.NewGoroutinesRejected(m)
+	if err != nil {
+		otel.Handle(err)
+	}
+
 	return func(fn Func) Func {
 		return func(ctx context.Context) error {
 			cb.mu.Lock()
@@ -85,15 +95,25 @@ func (cb *CircuitBreaker) middleware() Middleware {
 			case CircuitOpen:
 				if time.Since(cb.lastFailedAt) < cb.cfg.cooldown {
 					cb.mu.Unlock()
+
+					rejected.Add(ctx, 1, name)
+
 					return ErrCircuitOpen
 				}
 				// Cooldown elapsed — transition to half-open for a probe
-				cb.transition(CircuitHalfOpen)
+				notify, from := cb.transition(CircuitHalfOpen)
 				cb.mu.Unlock()
+
+				if notify != nil {
+					notify(from, CircuitHalfOpen)
+				}
 
 			case CircuitHalfOpen:
 				// Another probe is already in flight; reject
 				cb.mu.Unlock()
+
+				rejected.Add(ctx, 1, name)
+
 				return ErrCircuitOpen
 
 			default: // CircuitClosed
@@ -103,14 +123,26 @@ func (cb *CircuitBreaker) middleware() Middleware {
 			err := fn(ctx)
 
 			cb.mu.Lock()
-			defer cb.mu.Unlock()
+
+			var (
+				notify       func(CircuitState, CircuitState)
+				from         CircuitState
+				transitionTo CircuitState
+			)
 
 			if err != nil && cb.cfg.failureIf(err) {
 				cb.failures++
 				cb.lastFailedAt = time.Now()
 
 				if cb.failures >= cb.cfg.threshold {
-					cb.transition(CircuitOpen)
+					notify, from = cb.transition(CircuitOpen)
+					transitionTo = CircuitOpen
+				}
+
+				cb.mu.Unlock()
+
+				if notify != nil {
+					notify(from, transitionTo)
 				}
 
 				return err
@@ -120,7 +152,14 @@ func (cb *CircuitBreaker) middleware() Middleware {
 			cb.failures = 0
 
 			if cb.state == CircuitHalfOpen {
-				cb.transition(CircuitClosed)
+				notify, from = cb.transition(CircuitClosed)
+				transitionTo = CircuitClosed
+			}
+
+			cb.mu.Unlock()
+
+			if notify != nil {
+				notify(from, transitionTo)
 			}
 
 			return err
@@ -128,14 +167,17 @@ func (cb *CircuitBreaker) middleware() Middleware {
 	}
 }
 
-func (cb *CircuitBreaker) transition(to CircuitState) {
-	from := cb.state
-
+// transition sets the new state and returns the callback to invoke after
+// the mutex is released (if any). Must be called while cb.mu is held.
+func (cb *CircuitBreaker) transition(to CircuitState) (func(CircuitState, CircuitState), CircuitState) {
+	prev := cb.state
 	cb.state = to
 
-	if cb.cfg.onStateChange != nil && from != to {
-		cb.cfg.onStateChange(from, to)
+	if cb.cfg.onStateChange != nil && prev != to {
+		return cb.cfg.onStateChange, prev
 	}
+
+	return nil, prev
 }
 
 // CircuitBreakerThreshold sets the number of consecutive failures before the

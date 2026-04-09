@@ -3,8 +3,8 @@ prev:
   text: Core Concepts
   link: /guide/concepts
 next:
-  text: Start
-  link: /api/start
+  text: Wait
+  link: /api/wait
 ---
 
 # Go
@@ -37,7 +37,7 @@ See the full [Options reference](/api/options).
 ## Behavior
 
 1. Options are resolved with defaults (tracing, started counter, error counter, and active counter are enabled).
-2. A middleware chain is built: context injection, panic recovery, user middlewares, metrics, tracing, stall detection, timeout.
+2. A middleware chain is built (innermost to outermost): context injection (applied before the chain), panic recovery, timeout, retry, circuit breaker, fallback, user middlewares, metrics, tracing, stall detection.
 3. If a `WithLimiter` semaphore is set, it is acquired **before** spawning the goroutine. If the context is cancelled while waiting, the error is handled immediately.
 4. The goroutine runs with a derived context (`context.WithCancel`).
 5. If `fn` returns an error (or panics), the error is passed to the `ErrorHandler`. The default handler logs via `slog.ErrorContext`.

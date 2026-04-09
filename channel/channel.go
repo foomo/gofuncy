@@ -26,20 +26,21 @@ var ErrClosed = errors.New("channel is closed")
 // ------------------------------------------------------------------------------------------------
 
 type (
+	// Channel is a generic, observable channel with optional telemetry.
 	Channel[T any] struct {
 		name string
 		ch   chan T
 		l    *slog.Logger
 
 		// feature flags — all default true
-		chansCounter      bool
-		messagesCounter   bool
-		durationHistogram bool
-		tracing           bool
+		chansCounter        bool
+		messagesSentCounter bool
+		durationHistogram   bool
+		tracing             bool
 
 		// pre-resolved instruments
 		chansCurrent     gofuncyconv.ChansCurrent
-		messagesCurrent  gofuncyconv.MessagesCurrent
+		messagesSent     gofuncyconv.MessagesSent
 		messagesDuration gofuncyconv.MessagesDuration
 		tracer           trace.Tracer
 
@@ -55,6 +56,7 @@ type (
 		// config
 		bufferSize int
 	}
+	// Option configures a Channel during construction.
 	Option[T any] func(*Channel[T])
 )
 
@@ -62,48 +64,56 @@ type (
 // ~ Options
 // ------------------------------------------------------------------------------------------------
 
+// WithBuffer sets the channel buffer size.
 func WithBuffer[T any](size int) Option[T] {
 	return func(c *Channel[T]) {
 		c.bufferSize = size
 	}
 }
 
+// WithLogger sets the logger for telemetry errors.
 func WithLogger[T any](l *slog.Logger) Option[T] {
 	return func(c *Channel[T]) {
 		c.l = l
 	}
 }
 
+// WithMeterProvider sets a custom OTel meter provider.
 func WithMeterProvider[T any](mp metric.MeterProvider) Option[T] {
 	return func(c *Channel[T]) {
 		c.meterProvider = mp
 	}
 }
 
+// WithTracerProvider sets a custom OTel tracer provider.
 func WithTracerProvider[T any](tp trace.TracerProvider) Option[T] {
 	return func(c *Channel[T]) {
 		c.tracerProvider = tp
 	}
 }
 
+// WithoutChansCounter disables the open channels counter metric.
 func WithoutChansCounter[T any]() Option[T] {
 	return func(c *Channel[T]) {
 		c.chansCounter = false
 	}
 }
 
-func WithoutMessagesCounter[T any]() Option[T] {
+// WithoutMessagesSentCounter disables the messages sent counter metric.
+func WithoutMessagesSentCounter[T any]() Option[T] {
 	return func(c *Channel[T]) {
-		c.messagesCounter = false
+		c.messagesSentCounter = false
 	}
 }
 
+// WithDurationHistogram enables the message send duration histogram.
 func WithDurationHistogram[T any]() Option[T] {
 	return func(c *Channel[T]) {
 		c.durationHistogram = true
 	}
 }
 
+// WithTracing enables OpenTelemetry tracing for send operations.
 func WithTracing[T any]() Option[T] {
 	return func(c *Channel[T]) {
 		c.tracing = true
@@ -114,12 +124,13 @@ func WithTracing[T any]() Option[T] {
 // ~ Constructor
 // ------------------------------------------------------------------------------------------------
 
+// New creates a new Channel with the given name and options.
 func New[T any](name string, opts ...Option[T]) *Channel[T] {
 	c := &Channel[T]{
-		name:            name,
-		l:               slog.Default(),
-		chansCounter:    true,
-		messagesCounter: true,
+		name:                name,
+		l:                   slog.Default(),
+		chansCounter:        true,
+		messagesSentCounter: true,
 	}
 
 	for _, opt := range opts {
@@ -131,7 +142,7 @@ func New[T any](name string, opts ...Option[T]) *Channel[T] {
 	c.ch = make(chan T, c.bufferSize)
 	c.closing = make(chan struct{})
 
-	if c.chansCounter || c.messagesCounter || c.durationHistogram {
+	if c.chansCounter || c.messagesSentCounter || c.durationHistogram {
 		m := c.meter()
 
 		if c.chansCounter {
@@ -142,11 +153,11 @@ func New[T any](name string, opts ...Option[T]) *Channel[T] {
 			}
 		}
 
-		if c.messagesCounter {
-			if v, err := gofuncyconv.NewMessagesCurrent(m); err != nil {
-				c.l.Error("failed to create messages current metric", slog.String("error", err.Error()))
+		if c.messagesSentCounter {
+			if v, err := gofuncyconv.NewMessagesSent(m); err != nil {
+				c.l.Error("failed to create messages sent metric", slog.String("error", err.Error()))
 			} else {
-				c.messagesCurrent = v
+				c.messagesSent = v
 			}
 		}
 
@@ -174,6 +185,8 @@ func New[T any](name string, opts ...Option[T]) *Channel[T] {
 // ~ Public methods
 // ------------------------------------------------------------------------------------------------
 
+// Send sends one or more values into the channel. Returns ErrClosed if the
+// channel has been closed, or the context error if the context is cancelled.
 func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 	if c.isClosed.Load() {
 		return ErrClosed
@@ -206,8 +219,8 @@ func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 			}
 		}
 
-		if c.messagesCounter {
-			c.messagesCurrent.Add(ctx, 1, c.name)
+		if c.messagesSentCounter {
+			c.messagesSent.Add(ctx, 1, c.name)
 		}
 
 		if c.tracing && span != nil {
@@ -218,10 +231,12 @@ func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 	return nil
 }
 
+// Receive returns the underlying receive-only channel.
 func (c *Channel[T]) Receive() <-chan T {
 	return c.ch
 }
 
+// Close closes the channel. It is safe to call multiple times.
 func (c *Channel[T]) Close() {
 	if !c.isClosed.CompareAndSwap(false, true) {
 		return
@@ -237,14 +252,17 @@ func (c *Channel[T]) Close() {
 	}
 }
 
+// Len returns the number of elements currently in the channel buffer.
 func (c *Channel[T]) Len() int {
 	return len(c.ch)
 }
 
+// Cap returns the channel buffer capacity.
 func (c *Channel[T]) Cap() int {
 	return cap(c.ch)
 }
 
+// Name returns the channel name.
 func (c *Channel[T]) Name() string {
 	return c.name
 }

@@ -5,6 +5,7 @@ import (
 	"log/slog"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
@@ -52,7 +53,10 @@ func withRecover(fn Func) Func {
 }
 
 func withStartedCounter(fn Func, m metric.Meter, name string) Func {
-	started, _ := gofuncyconv.NewGoroutinesStarted(m)
+	started, err := gofuncyconv.NewGoroutinesStarted(m)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return func(ctx context.Context) error {
 		started.Add(ctx, 1, name)
@@ -61,7 +65,10 @@ func withStartedCounter(fn Func, m metric.Meter, name string) Func {
 }
 
 func withErrorCounter(fn Func, m metric.Meter, name string) Func {
-	errors, _ := gofuncyconv.NewGoroutinesErrors(m)
+	errors, err := gofuncyconv.NewGoroutinesErrors(m)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return func(ctx context.Context) error {
 		err := fn(ctx)
@@ -74,19 +81,25 @@ func withErrorCounter(fn Func, m metric.Meter, name string) Func {
 }
 
 func withActiveUpDownCounter(fn Func, m metric.Meter, name string) Func {
-	active, _ := gofuncyconv.NewGoroutinesActive(m)
+	active, err := gofuncyconv.NewGoroutinesActive(m)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return func(ctx context.Context) error {
 		active.Add(ctx, 1, name)
 
-		defer func() { active.Add(ctx, -1, name) }()
+		defer func() { active.Add(context.WithoutCancel(ctx), -1, name) }()
 
 		return fn(ctx)
 	}
 }
 
 func withDurationHistogram(fn Func, m metric.Meter, name string) Func {
-	duration, _ := gofuncyconv.NewGoroutinesDuration(m)
+	duration, err := gofuncyconv.NewGoroutinesDuration(m)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return func(ctx context.Context) error {
 		start := time.Now()
@@ -112,6 +125,7 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 	}
 
 	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
+	spanName := spanPrefix + " " + o.name
 
 	return func(ctx context.Context) error {
 		attrs := traceAttrs
@@ -122,7 +136,7 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 		}
 
 		ctx, span := o.tracer().Start(ctx,
-			spanPrefix+" "+o.name,
+			spanName,
 			trace.WithAttributes(attrs...),
 		)
 
@@ -139,7 +153,10 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 }
 
 func withStallDetector(fn Func, threshold time.Duration, handler StallHandler, m metric.Meter, l *slog.Logger, name string) Func {
-	stalled, _ := gofuncyconv.NewGoroutinesStalled(m)
+	stalled, err := gofuncyconv.NewGoroutinesStalled(m)
+	if err != nil {
+		otel.Handle(err)
+	}
 
 	return func(ctx context.Context) error {
 		timer := time.AfterFunc(threshold, func() {
@@ -172,11 +189,15 @@ func buildChain(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 	}
 
 	if o.retryAttempts > 1 {
-		run = Retry(o.retryAttempts, o.retryOpts...)(run)
+		opts := make([]RetryOption, len(o.retryOpts)+1)
+		copy(opts, o.retryOpts)
+		opts[len(o.retryOpts)] = retryWithMeter(o.meter(), o.name)
+
+		run = Retry(o.retryAttempts, opts...)(run)
 	}
 
 	if o.circuitBreaker != nil {
-		run = o.circuitBreaker.middleware()(run)
+		run = o.circuitBreaker.middleware(o.meter(), o.name)(run)
 	}
 
 	if o.fallbackFn != nil {

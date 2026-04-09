@@ -6,6 +6,8 @@ import (
 
 // Go spawns a fire-and-forget goroutine with panic recovery.
 // Errors are logged via slog by default; use WithErrorHandler to override.
+// The name is used as a metric attribute — use static, low-cardinality values
+// (not request IDs or UUIDs) to avoid unbounded metric series.
 func Go(ctx context.Context, name string, fn Func, opts ...GoOption) {
 	o := newGoOptions(opts)
 	o.name = name

@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"go.opentelemetry.io/otel"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/trace"
 
@@ -20,17 +21,20 @@ type Group struct {
 	cancel context.CancelFunc
 	o      options
 
-	wg  sync.WaitGroup
-	sem chan struct{}
+	wg   sync.WaitGroup
+	sem  chan struct{}
+	once sync.Once
 
 	mu   sync.Mutex
 	errs []error
+	err  error
 
 	span  trace.Span
 	start time.Time
 }
 
 // NewGroup creates a new Group with the given context and options.
+// The name is used as a metric attribute — use static, low-cardinality values.
 func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 	o := newGroupOptions(opts)
 	o.name = name
@@ -41,7 +45,7 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 	}
 
 	if o.failFast {
-		g.ctx, g.cancel = context.WithCancel(ctx)
+		g.ctx, g.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is called in Wait()
 	}
 
 	if o.limit > 0 {
@@ -70,7 +74,8 @@ func (g *Group) Add(name string, fn Func, opts ...GoOption) {
 
 	o.name = name
 
-	run := buildChain(fn, &o, "gofuncy.group.add", 3)
+	run := withContextInjection(fn, o.name)
+	run = buildChain(run, &o, "gofuncy.group.add", 3)
 
 	g.mu.Lock()
 	idx := len(g.errs)
@@ -90,7 +95,15 @@ func (g *Group) Add(name string, fn Func, opts ...GoOption) {
 			return
 		}
 	} else if g.sem != nil {
-		g.sem <- struct{}{}
+		select {
+		case g.sem <- struct{}{}:
+		case <-g.ctx.Done():
+			g.mu.Lock()
+			g.errs[idx] = g.ctx.Err()
+			g.mu.Unlock()
+
+			return
+		}
 	}
 
 	g.wg.Go(func() {
@@ -113,49 +126,58 @@ func (g *Group) Add(name string, fn Func, opts ...GoOption) {
 }
 
 // Wait blocks until all added functions complete and returns the joined errors.
+// It is safe to call multiple times — the result is computed once.
 func (g *Group) Wait() error {
-	g.wg.Wait()
+	g.once.Do(func() {
+		g.wg.Wait()
 
-	hasErr := false
+		hasErr := false
 
-	if g.span != nil {
-		g.span.SetAttributes(semconv.GroupSize(len(g.errs)))
+		if g.span != nil {
+			g.span.SetAttributes(semconv.GroupSize(len(g.errs)))
 
-		for _, e := range g.errs {
-			if e != nil {
-				hasErr = true
-
-				g.span.RecordError(e)
-			}
-		}
-
-		if hasErr {
-			g.span.SetStatus(codes.Error, "group completed with errors")
-		}
-
-		g.span.End()
-	}
-
-	if g.o.durationHistogram {
-		if !hasErr {
 			for _, e := range g.errs {
 				if e != nil {
 					hasErr = true
 
-					break
+					g.span.RecordError(e)
 				}
 			}
+
+			if hasErr {
+				g.span.SetStatus(codes.Error, "group completed with errors")
+			}
+
+			g.span.End()
 		}
 
-		dur := time.Since(g.start).Truncate(time.Millisecond).Seconds()
+		if g.o.durationHistogram {
+			if !hasErr {
+				for _, e := range g.errs {
+					if e != nil {
+						hasErr = true
 
-		groupDuration, _ := gofuncyconv.NewGroupsDuration(g.o.meter())
-		groupDuration.Record(context.WithoutCancel(g.ctx), dur, g.o.name, hasErr)
-	}
+						break
+					}
+				}
+			}
 
-	if g.cancel != nil {
-		g.cancel()
-	}
+			dur := time.Since(g.start).Truncate(time.Millisecond).Seconds()
 
-	return errors.Join(g.errs...)
+			groupDuration, err := gofuncyconv.NewGroupsDuration(g.o.meter())
+			if err != nil {
+				otel.Handle(err)
+			}
+
+			groupDuration.Record(context.WithoutCancel(g.ctx), dur, g.o.name, hasErr)
+		}
+
+		if g.cancel != nil {
+			g.cancel()
+		}
+
+		g.err = errors.Join(g.errs...)
+	})
+
+	return g.err
 }

@@ -2,6 +2,7 @@ package gofuncy_test
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
@@ -9,6 +10,22 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func ExampleCtx() {
+	done := make(chan struct{})
+
+	gofuncy.Go(context.Background(), "worker", func(ctx context.Context) error {
+		defer close(done)
+
+		fmt.Println("name:", gofuncy.NameFromContext(ctx))
+
+		return nil
+	})
+
+	<-done
+	// Output:
+	// name: worker
+}
 
 func TestCtx_NoName(t *testing.T) {
 	t.Parallel()

@@ -2,6 +2,7 @@ package channel_test
 
 import (
 	"context"
+	"fmt"
 	"sync"
 	"testing"
 	"time"
@@ -10,6 +11,19 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func ExampleNew() {
+	ch := channel.New[string]("events", channel.WithBuffer[string](3))
+	defer ch.Close()
+
+	_ = ch.Send(context.Background(), "hello", "world")
+
+	fmt.Println(<-ch.Receive())
+	fmt.Println(<-ch.Receive())
+	// Output:
+	// hello
+	// world
+}
 
 func TestChannel_sendAndReceive(t *testing.T) {
 	t.Parallel()
@@ -199,7 +213,7 @@ func TestChannel_withoutMessagesCounter(t *testing.T) {
 
 	ch := channel.New[int]("no-messages",
 		channel.WithBuffer[int](5),
-		channel.WithoutMessagesCounter[int](),
+		channel.WithoutMessagesSentCounter[int](),
 	)
 
 	require.NoError(t, ch.Send(t.Context(), 1))
@@ -242,7 +256,7 @@ func TestChannel_allTelemetryDisabled(t *testing.T) {
 	ch := channel.New[int]("bare",
 		channel.WithBuffer[int](5),
 		channel.WithoutChansCounter[int](),
-		channel.WithoutMessagesCounter[int](),
+		channel.WithoutMessagesSentCounter[int](),
 	)
 
 	require.NoError(t, ch.Send(t.Context(), 1, 2, 3))
@@ -274,7 +288,7 @@ func BenchmarkChannel_noTelemetry(b *testing.B) {
 	ch := channel.New[int]("bench-bare",
 		channel.WithBuffer[int](1),
 		channel.WithoutChansCounter[int](),
-		channel.WithoutMessagesCounter[int](),
+		channel.WithoutMessagesSentCounter[int](),
 	)
 	ctx := context.Background()
 

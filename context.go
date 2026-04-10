@@ -4,23 +4,34 @@ import (
 	"context"
 )
 
-type contextKey string
+type contextKey int
 
+// Context wraps a standard context with helper methods for accessing
+// gofuncy routine name and parent information.
 type Context struct {
 	context.Context //nolint:containedctx
 }
 
 const (
-	NameRoot   string = "root"
+	// NameRoot is the default root name used for setting or retrieving the root context in a routine hierarchy.
+	NameRoot string = "root"
+	// NameNoName is the default name used when no routine name is explicitly set.
 	NameNoName string = "noname"
 )
 
 const (
-	contextKeyName   contextKey = "name"
-	contextKeyParent contextKey = "parentRoutine"
+	contextKeyName contextKey = iota
+	contextKeyParent
+	contextKeyRoutine
 )
 
-// Ctx helper
+// routineInfo stores both name and parent in a single context value to reduce allocations.
+type routineInfo struct {
+	name   string
+	parent string
+}
+
+// Ctx wraps a context.Context with gofuncy helper methods.
 func Ctx(ctx context.Context) Context {
 	return Context{Context: ctx}
 }
@@ -40,11 +51,13 @@ func (c Context) Root() context.Context {
 	return injectNameIntoContext(c.Context, NameRoot)
 }
 
-func injectNameIntoContext(ctx context.Context, name string) context.Context {
-	return context.WithValue(ctx, contextKeyName, name)
-}
-
+// NameFromContext extracts the routine name from the given context, falling back to a default "noname" if not found.
 func NameFromContext(ctx context.Context) string {
+	// check combined key first
+	if ri, ok := ctx.Value(contextKeyRoutine).(routineInfo); ok {
+		return ri.name
+	}
+
 	if value, ok := ctx.Value(contextKeyName).(string); ok {
 		return value
 	}
@@ -56,10 +69,24 @@ func injectParentIntoContext(ctx context.Context, name string) context.Context {
 	return context.WithValue(ctx, contextKeyParent, name)
 }
 
+// ParentFromContext extracts the parent routine name from the given context.
 func ParentFromContext(ctx context.Context) string {
+	// check combined key first
+	if ri, ok := ctx.Value(contextKeyRoutine).(routineInfo); ok {
+		return ri.parent
+	}
+
 	if value, ok := ctx.Value(contextKeyParent).(string); ok {
 		return value
 	}
 
 	return ""
+}
+
+func injectRoutineIntoContext(ctx context.Context, name, parent string) context.Context {
+	return context.WithValue(ctx, contextKeyRoutine, routineInfo{name: name, parent: parent})
+}
+
+func injectNameIntoContext(ctx context.Context, name string) context.Context {
+	return context.WithValue(ctx, contextKeyName, name)
 }

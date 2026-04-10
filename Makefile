@@ -32,7 +32,7 @@ endif
 
 .PHONY: check
 ## Run lint & test
-check: tidy generate lint test
+check: tidy generate lint test audit
 
 .PHONY: tidy
 ## Run go mod tidy
@@ -51,6 +51,12 @@ lint:
 lint.fix:
 	@echo "〉golangci-lint run fix"
 	@golangci-lint run --fix
+
+.PHONY: lint.branch
+## Run linter with --new-from-rev=origin/main
+lint.branch:
+	@echo "〉golangci-lint run with --new-from-rev=origin/main"
+	@golangci-lint run --new-from-rev=origin/main
 
 .PHONY: test
 ## Run tests
@@ -84,17 +90,34 @@ test.bench.update:
 	@GO_TEST_TAGS=-skip go test -tags=safe -bench=. -benchmem -count=10 ./... > benchmark.txt
 	@echo "✅ benchmark.txt updated"
 
-.PHONY: outdated
-## Show outdated direct dependencies
-outdated:
-	@echo "〉go mod outdated"
-	@go list -u -m -json all | go-mod-outdated -update -direct
-
 .PHONY: generate
 ## Run go generate
 generate:
 	@echo "〉go generate"
 	@go generate ./...
+
+### Dependencies
+
+.PHONY: audit
+## Run security audit
+audit:
+	@echo "〉trivy scan"
+	@trivy fs . --format table --severity HIGH,CRITICAL
+
+.PHONY: outdated
+## Show outdated direct dependencies
+outdated:
+	@echo "〉mise"
+	@mise outdated -l --local
+	@echo "〉go mod outdated"
+	@go list -u -m -json all | go-mod-outdated -update -direct
+
+.PHONY: upgrade
+## Show outdated direct dependencies
+upgrade: go.work
+	@echo "〉go mod upgrade"
+	@go get -t -u all
+
 
 ### Documentation
 
@@ -121,7 +144,11 @@ godocs:
 .PHONY: help
 ## Show help text
 help:
-	@echo "gofuncy\n"
+	@echo ""
+	@echo "░█▀▀░█▀█░█▀▀░█░█░█▀█░█▀▀░█░█"
+	@echo "░█░█░█░█░█▀▀░█░█░█░█░█░░░░█░"
+	@echo "░▀▀▀░▀▀▀░▀░░░▀▀▀░▀░▀░▀▀▀░░▀░"
+	@echo ""
 	@echo "Usage:\n  make [task]"
 	@awk '{ \
 		if($$0 ~ /^### /){ \

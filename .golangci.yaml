@@ -10,6 +10,7 @@ linters:
   disable:
     # Project specific linters
     - goconst
+    - paralleltest
     # Discouraged linters
     - noinlineerr # Disallows inline error handling (`if err := ...; err != nil {`).
     - embeddedstructfieldcheck #  Embedded types should be at the top of the field list of a struct, and there must be an empty line separating embedded fields from regular fields. [fast]
@@ -52,27 +53,25 @@ linters:
 
   # https://golangci-lint.run/docs/linters/
   settings:
+    # https://golangci-lint.run/docs/linters/configuration/#exhaustive
     exhaustive:
       default-signifies-exhaustive: true
-    gocritic:
-      disabled-checks:
-        - assignOp
-        - ifElseChain
-    gomoddirectives:
-      replace-local: true
-      replace-allow-list:
-        - github.com/iancoleman/strcase
+    # https://golangci-lint.run/docs/linters/configuration/#gosec
     gosec:
       severity: medium
       confidence: medium
+    # https://golangci-lint.run/docs/linters/configuration/#revive
     revive:
       rules:
-        - name: exported
-          disabled: true
         - name: package-comments
           disabled: true
+    # https://golangci-lint.run/docs/linters/configuration/#gomoddirectives
+    gomoddirectives:
+      tool-forbidden: true
+      go-debug-forbidden: true
+      toolchain-forbidden: true
+      go-version-pattern: '\d\.\d+'
   exclusions:
-    generated: lax
     presets:
       - comments
       - common-false-positives
@@ -82,9 +81,11 @@ linters:
       - path: _test\.go
         linters:
           - forbidigo
-          - gosec
     paths:
-      - examples
+      - docs
+      - tmp
+
+# https://golangci-lint.run/docs/formatters/
 formatters:
   enable:
     - gofmt

@@ -1,0 +1,33 @@
+package gofuncy
+
+import (
+	"context"
+)
+
+// Map transforms items concurrently, preserving input order.
+// Returns results and the joined errors.
+// All GroupOption options apply (WithLimit, WithFailFast, telemetry, etc.).
+func Map[T, R any](ctx context.Context, name string, items []T, fn func(ctx context.Context, item T) (R, error), opts ...GroupOption) ([]R, error) {
+	if len(items) == 0 {
+		return nil, nil
+	}
+
+	results := make([]R, len(items))
+
+	g := NewGroup(ctx, name, opts...)
+
+	for i, item := range items {
+		g.Add(name, func(ctx context.Context) error {
+			r, err := fn(ctx, item)
+			if err != nil {
+				return err
+			}
+
+			results[i] = r
+
+			return nil
+		})
+	}
+
+	return results, g.Wait() //nolint:contextcheck
+}

@@ -2,225 +2,45 @@ package gofuncy
 
 import (
 	"context"
-	"crypto/sha256"
-	"fmt"
-	"os"
-	"runtime"
-	"time"
-
-	"github.com/Ju0x/humanhash"
-	"go.opentelemetry.io/otel"
-	"go.opentelemetry.io/otel/attribute"
-	"go.opentelemetry.io/otel/codes"
-	"go.opentelemetry.io/otel/metric"
-	semconv "go.opentelemetry.io/otel/semconv/v1.30.0"
-	"go.opentelemetry.io/otel/trace"
-	"go.uber.org/zap"
-	"go.uber.org/zap/zapcore"
 )
 
-type (
-	Options struct {
-		l     *zap.Logger
-		ctx   context.Context //nolint:containedctx // required
-		level zapcore.Level
-		name  string
-		// telemetry
-		meter                    metric.Meter
-		tracer                   trace.Tracer
-		runningCounter           metric.Int64UpDownCounter
-		runningCounterName       string
-		completedCounter         metric.Int64Counter
-		completedCounterName     string
-		durationHistogram        metric.Int64Histogram
-		durationHistogramName    string
-		durationHistogramEnabled bool
-		telemetryEnabled         bool
-	}
-	Option func(*Options)
-)
+// Go spawns a fire-and-forget goroutine with panic recovery.
+// Errors are logged via slog by default; use WithErrorHandler to override.
+// The name is used as a metric attribute — use static, low-cardinality values
+// (not request IDs or UUIDs) to avoid unbounded metric series.
+func Go(ctx context.Context, name string, fn Func, opts ...GoOption) {
+	o := newGoOptions(opts)
+	o.name = name
 
-func WithName(name string) Option {
-	return func(o *Options) {
-		o.name = name
-	}
-}
-
-func WithContext(ctx context.Context) Option {
-	return func(o *Options) {
-		o.ctx = ctx
-	}
-}
-
-func WithLogger(l *zap.Logger) Option {
-	return func(o *Options) {
-		o.l = l
-	}
-}
-
-func WithLogLevel(level zapcore.Level) Option {
-	return func(o *Options) {
-		o.level = level
-	}
-}
-
-func WithMeter(v metric.Meter) Option {
-	return func(o *Options) {
-		o.meter = v
-	}
-}
-
-func WithTracer(v trace.Tracer) Option {
-	return func(o *Options) {
-		o.tracer = v
-	}
-}
-
-func WithCompletedCounterName(name string) Option {
-	return func(o *Options) {
-		o.completedCounterName = name
-	}
-}
-
-func WithRunningCounterName(name string) Option {
-	return func(o *Options) {
-		o.runningCounterName = name
-	}
-}
-
-func WithDurationHistogramEnabled(v bool) Option {
-	return func(o *Options) {
-		o.durationHistogramEnabled = v
-	}
-}
-
-func WithHistogramName(name string) Option {
-	return func(o *Options) {
-		o.durationHistogramName = name
-	}
-}
-
-func Go(fn Func, opts ...Option) <-chan error {
-	o := &Options{
-		l:                     zap.NewNop(),
-		level:                 zapcore.DebugLevel,
-		runningCounterName:    "gofuncy.routine.running.count",
-		completedCounterName:  "gofuncy.routine.completed.count",
-		durationHistogramName: "gofuncy.routine.duration",
-		telemetryEnabled:      os.Getenv("OTEL_ENABLED") == "true",
+	if !o.childTrace {
+		o.detachedTrace = true
 	}
 
-	for _, opt := range opts {
-		if opt != nil {
-			opt(o)
+	run := withContextInjection(fn, o.name)
+	run = buildChain(run, &o, "gofuncy.go", o.callerSkip+3)
+
+	if o.limiter != nil {
+		if err := o.limiter.Acquire(ctx, 1); err != nil {
+			handleError(ctx, err, o.errorHandler, o.l, o.name)
+			return
 		}
 	}
 
-	if o.ctx == nil {
-		o.ctx = context.Background()
-	}
-	if o.name == "" {
-		if _, file, line, ok := runtime.Caller(0); ok {
-			h := sha256.New()
-			_, _ = fmt.Fprintf(h, "%s:%d", file, line)
-			o.name, _ = humanhash.Humanize(h.Sum(nil), 2, "-")
+	go func(ctx context.Context) {
+		if o.limiter != nil {
+			defer o.limiter.Release(1)
 		}
-	}
-	// create telemetry if enabled
-	if o.telemetryEnabled {
-		if o.meter == nil {
-			o.meter = otel.Meter("gofuncy")
-		}
-		if o.tracer == nil {
-			o.tracer = otel.Tracer("gofuncy")
-		}
-	}
-	if o.meter != nil {
-		if value, err := o.meter.Int64UpDownCounter(
-			o.runningCounterName,
-			metric.WithDescription("Gofuncy running go routine count"),
-		); err != nil {
-			o.l.Error("failed to initialize counter", zap.Error(err))
-		} else {
-			o.runningCounter = value
-		}
-		if value, err := o.meter.Int64Counter(
-			o.completedCounterName,
-			metric.WithDescription("Gofuncy completed go routine count"),
-		); err != nil {
-			o.l.Error("failed to initialize counter", zap.Error(err))
-		} else {
-			o.completedCounter = value
-		}
-	}
-	if o.meter != nil && o.durationHistogramEnabled {
-		if value, err := o.meter.Int64Histogram(
-			o.durationHistogramName,
-			metric.WithDescription("Gofuncy go routine duration histogram"),
-		); err != nil {
-			o.l.Error("failed to initialize histogram", zap.Error(err))
-		} else {
-			o.durationHistogram = value
-		}
-	}
 
-	delay := time.Now()
-	errChan := make(chan error, 1)
-	go func(o *Options, errChan chan<- error) {
-		var err error
-		ctx := o.ctx
-		start := time.Now()
-		defer close(errChan)
-		l := o.l.With(zap.String("name", o.name))
-		if value := RoutineFromContext(ctx); value != NoNameRoutine {
-			l = l.With(zap.String("parent", value))
-		}
-		var span trace.Span
-		if o.tracer != nil {
-			ctx, span = o.tracer.Start(o.ctx, o.name)
-			if span.IsRecording() {
-				l = l.With(zap.String("trace_id", span.SpanContext().TraceID().String()))
-			}
-			defer func() {
-				if err != nil {
-					span.RecordError(err)
-					span.SetStatus(codes.Error, err.Error())
-				}
-				span.End()
-			}()
-		}
-		l.Log(o.level, "starting gofuncy routine",
-			zap.Duration("delay", time.Since(delay).Round(time.Millisecond)),
-		)
-		defer func() {
-			l.Log(o.level, "exiting gofuncy routine",
-				zap.Duration("duration", time.Since(start).Round(time.Millisecond)),
-				zap.Error(err),
-			)
-		}()
-		// create telemetry if enabled
-		attrs := metric.WithAttributes(semconv.ProcessRuntimeName(o.name))
-		if o.runningCounter != nil {
-			o.runningCounter.Add(ctx, 1, attrs)
-			defer o.runningCounter.Add(ctx, -1, attrs)
-		}
-		if o.completedCounter != nil {
-			defer o.completedCounter.Add(ctx, 1, attrs, metric.WithAttributes(
-				attribute.Bool("error", err != nil),
-			))
-		}
-		if o.durationHistogram != nil {
-			defer func() {
-				o.durationHistogram.Record(ctx, time.Since(start).Milliseconds(), attrs, metric.WithAttributes(
-					attribute.Bool("error", err != nil),
-				))
-			}()
-		}
-		ctx = injectParentRoutineIntoContext(ctx, RoutineFromContext(ctx))
-		ctx = injectRoutineIntoContext(ctx, o.name)
-		err = fn(ctx)
-		errChan <- err
-	}(o, errChan)
+		ctx, cancel := context.WithCancel(ctx)
+		defer cancel()
 
-	return errChan
+		if ctx.Err() != nil {
+			handleError(ctx, ctx.Err(), o.errorHandler, o.l, o.name)
+			return
+		}
+
+		if err := run(ctx); err != nil {
+			handleError(ctx, err, o.errorHandler, o.l, o.name)
+		}
+	}(ctx)
 }

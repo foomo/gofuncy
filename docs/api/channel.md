@@ -42,7 +42,7 @@ func New[T any](name string, opts ...Option[T]) *Channel[T]
 | Buffer size | `0` (unbuffered) | `WithBuffer[T](size)` |
 | Logger | `slog.Default()` | `WithLogger[T](l)` |
 | Chans counter (`gofuncy.chans.current`) | **on** | `WithoutChansCounter[T]()` |
-| Messages counter (`gofuncy.messages.current`) | **on** | `WithoutMessagesCounter[T]()` |
+| Messages sent counter (`gofuncy.messages.sent`) | **on** | `WithoutMessagesSentCounter[T]()` |
 | Duration histogram (`gofuncy.messages.duration.seconds`) | off | `WithDurationHistogram[T]()` |
 | Tracing | off | `WithTracing[T]()` |
 | Meter provider | OTel global | `WithMeterProvider[T](mp)` |
@@ -59,7 +59,7 @@ Counters are cheap and enabled by default. Duration histogram and tracing are op
 3. `Send` writes values to the channel one at a time. For each value:
    - If the context is cancelled, returns the context error immediately.
    - If the channel is closed, returns `channel.ErrClosed`.
-   - If the messages counter is enabled, increments `gofuncy.messages.current`.
+   - If the messages sent counter is enabled, increments `gofuncy.messages.sent`.
    - If the duration histogram is enabled, records the time spent waiting for the channel to accept the value (backpressure detection).
    - If tracing is enabled, adds a span event for each sent value.
 4. `Receive` returns the raw underlying `<-chan T`. This is zero-allocation and works with `range`.
@@ -148,9 +148,9 @@ func main() {
 | Metric | Type | Description |
 |--------|------|-------------|
 | `gofuncy.chans.current` | UpDownCounter | Number of open channels. Attributes: `gofuncy.chan.name`, `gofuncy.chan.cap`. |
-| `gofuncy.messages.current` | UpDownCounter | Number of in-flight (buffered) messages. Attributes: `gofuncy.chan.name`. |
+| `gofuncy.messages.sent` | Counter | Total messages sent. Attributes: `gofuncy.chan.name`. |
 | `gofuncy.messages.duration.seconds` | Histogram | Time spent waiting for the channel to accept a value. High values indicate backpressure. Attributes: `gofuncy.chan.name`. |
 
 ::: warning
-`Receive()` returns the raw Go channel, so the messages counter is incremented on `Send` but not decremented on receive. Use the counter to detect stuck or filling channels — if it only goes up, nothing is consuming.
+`Receive()` returns the raw Go channel. The `gofuncy.messages.sent` counter tracks total sends only — it is not decremented on receive. To detect stuck or filling channels, compare the sent counter growth over time or use the duration histogram to measure backpressure.
 :::

@@ -15,8 +15,8 @@ gofuncy uses functional options to configure behavior. There are three option ca
 
 | Type | Applies to | Example |
 |------|-----------|---------|
-| `baseOpt` | `Do`, `Go`, `NewGroup`, `Group.Add` | `WithRetry`, `WithTimeout`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger` |
-| `goOnlyOpt` | `Do`, `Go`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
+| `baseOpt` | `Do`, `Wait`, `Go`, `NewGroup`, `Group.Add` | `WithRetry`, `WithTimeout`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithDetachedTrace`, `WithChildTrace` |
+| `goOnlyOpt` | `Do`, `Wait`, `Go`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
 | `groupOnlyOpt` | `NewGroup` | `WithLimit`, `WithFailFast` |
 
 Options are implemented as interfaces (`GoOption` and `GroupOption`), so the compiler prevents you from passing a group-only option to `Go()` or a go-only option to `NewGroup()`.
@@ -230,6 +230,8 @@ OpenTelemetry tracing and metrics are enabled by default. Every `Go` and `Group.
 | `gofuncy.goroutines.started` | Counter | Total goroutines started |
 | `gofuncy.goroutines.errors` | Counter | Total goroutine errors |
 | `gofuncy.goroutines.active` | UpDownCounter | Currently active goroutines |
+| `gofuncy.goroutines.retries` | Counter | Total retry attempts |
+| `gofuncy.goroutines.circuitbreaker.rejected` | Counter | Total circuit breaker rejections |
 
 ### Optional Metrics
 

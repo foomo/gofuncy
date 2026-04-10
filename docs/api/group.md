@@ -29,7 +29,7 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group
 
 ### Accepted Options
 
-**Shared** (`baseOpt`): `WithLogger`, `WithTimeout`, `WithMiddleware`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
+**Shared** (`baseOpt`): `WithTimeout`, `WithRetry`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithDetachedTrace`, `WithChildTrace`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
 
 **Group-only** (`groupOnlyOpt`): `WithLimit`, `WithFailFast`
 

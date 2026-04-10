@@ -41,7 +41,6 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 
 	g := &Group{
 		ctx: ctx,
-		o:   o,
 	}
 
 	if o.failFast {
@@ -57,8 +56,22 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 	}
 
 	if o.tracing {
-		g.ctx, g.span = o.tracer().Start(g.ctx, "gofuncy.group "+o.name) //nolint:spancheck
+		startOpts := []trace.SpanStartOption{}
+
+		if o.detachedTrace {
+			if parentSpan := trace.SpanFromContext(ctx); parentSpan.SpanContext().IsValid() {
+				startOpts = append(startOpts,
+					trace.WithNewRoot(),
+					trace.WithLinks(trace.Link{SpanContext: parentSpan.SpanContext()}),
+				)
+			}
+		}
+
+		g.ctx, g.span = o.tracer().Start(g.ctx, "gofuncy.group "+o.name, startOpts...) //nolint:spancheck
+		o.detachedTrace = false
 	}
+
+	g.o = o
 
 	return g
 }

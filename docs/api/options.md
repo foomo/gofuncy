@@ -150,7 +150,7 @@ func WithStallHandler(h StallHandler) baseOpt
 Sets a custom callback for stall detection. If not set, stalls are logged via `slog`.
 
 ```go
-type StallHandler func(ctx context.Context, name string, elapsed time.Duration)
+type StallHandler func(ctx context.Context, name string, threshold time.Duration)
 ```
 
 ### WithLimiter
@@ -180,6 +180,24 @@ func WithoutTracing() baseOpt
 ```
 
 Disables OpenTelemetry span creation for the operation. Tracing is enabled by default.
+
+### WithDetachedTrace
+
+```go
+func WithDetachedTrace() baseOpt
+```
+
+Creates new root spans linked to the parent span context instead of child spans. This is useful when goroutines represent independent work units (e.g., event processing) that should not be nested under the caller's trace but should still reference it.
+
+For `Go()`, detached traces are the default — use `WithChildTrace` to opt out. For `Do()`, `Wait()`, and `NewGroup()`, child traces are the default.
+
+### WithChildTrace
+
+```go
+func WithChildTrace() baseOpt
+```
+
+Forces child spans instead of detached root spans. This is primarily useful with `Go()` to override its default detached behavior.
 
 ### WithoutStartedCounter
 

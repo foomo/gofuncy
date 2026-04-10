@@ -56,6 +56,8 @@ type options struct { //nolint:recvcheck
 	stallHandler   StallHandler
 	// telemetry
 	tracing             bool
+	detachedTrace       bool
+	childTrace          bool
 	startedCounter      bool
 	errorCounter        bool
 	activeUpDownCounter bool
@@ -128,6 +130,8 @@ func (o options) merge(override options) options {
 	}
 
 	o.tracing = o.tracing || override.tracing
+	o.detachedTrace = o.detachedTrace || override.detachedTrace
+	o.childTrace = o.childTrace || override.childTrace
 	o.startedCounter = o.startedCounter || override.startedCounter
 	o.errorCounter = o.errorCounter || override.errorCounter
 	o.activeUpDownCounter = o.activeUpDownCounter || override.activeUpDownCounter
@@ -235,6 +239,27 @@ func WithDurationHistogram() baseOpt {
 func WithoutTracing() baseOpt {
 	return func(o *options) {
 		o.tracing = false
+	}
+}
+
+// WithDetachedTrace creates new root spans linked to the parent span context
+// instead of child spans. This is useful when goroutines represent independent
+// work units (e.g., event processing) that should not be nested under the
+// caller's trace but should still reference it.
+//
+// For Go(), detached traces are the default — use WithChildTrace to opt out.
+// For Do(), Wait(), and NewGroup(), child traces are the default.
+func WithDetachedTrace() baseOpt {
+	return func(o *options) {
+		o.detachedTrace = true
+	}
+}
+
+// WithChildTrace forces child spans instead of detached root spans.
+// This is primarily useful with Go() to override its default detached behavior.
+func WithChildTrace() baseOpt {
+	return func(o *options) {
+		o.childTrace = true
 	}
 }
 

@@ -32,7 +32,7 @@ endif
 
 .PHONY: check
 ## Run lint & test
-check: tidy generate lint test
+check: tidy generate lint test audit
 
 .PHONY: tidy
 ## Run go mod tidy
@@ -98,9 +98,13 @@ generate:
 
 ### Dependencies
 
+.PHONY: audit
+## Run security audit
+audit:
+	@echo "〉trivy scan"
+	@trivy fs . --format table --severity HIGH,CRITICAL
+
 .PHONY: outdated
-## Show outdated direct dependencies
-outdated:
 	@echo "〉go mod outdated"
 	@go list -u -m -json all | go-mod-outdated -update -direct
 

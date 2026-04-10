@@ -12,6 +12,10 @@ func Go(ctx context.Context, name string, fn Func, opts ...GoOption) {
 	o := newGoOptions(opts)
 	o.name = name
 
+	if !o.childTrace {
+		o.detachedTrace = true
+	}
+
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.go", o.callerSkip+3)
 

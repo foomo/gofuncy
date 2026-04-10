@@ -135,10 +135,20 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 			attrs = append(attrs, semconv.RoutineParent(routineName))
 		}
 
-		ctx, span := o.tracer().Start(ctx,
-			spanName,
+		startOpts := []trace.SpanStartOption{
 			trace.WithAttributes(attrs...),
-		)
+		}
+
+		if o.detachedTrace {
+			if parentSpan := trace.SpanFromContext(ctx); parentSpan.SpanContext().IsValid() {
+				startOpts = append(startOpts,
+					trace.WithNewRoot(),
+					trace.WithLinks(trace.Link{SpanContext: parentSpan.SpanContext()}),
+				)
+			}
+		}
+
+		ctx, span := o.tracer().Start(ctx, spanName, startOpts...)
 
 		err := fn(ctx)
 		if err != nil {

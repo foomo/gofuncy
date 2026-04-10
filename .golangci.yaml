@@ -68,6 +68,7 @@ linters:
     # https://golangci-lint.run/docs/linters/configuration/#gomoddirectives
     gomoddirectives:
       tool-forbidden: true
+      go-debug-forbidden: true
       toolchain-forbidden: true
       go-version-pattern: '\d\.\d+'
   exclusions:

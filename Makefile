@@ -105,6 +105,10 @@ audit:
 	@trivy fs . --format table --severity HIGH,CRITICAL
 
 .PHONY: outdated
+## Show outdated direct dependencies
+outdated:
+	@echo "〉mise"
+	@mise outdated -l --local
 	@echo "〉go mod outdated"
 	@go list -u -m -json all | go-mod-outdated -update -direct
 

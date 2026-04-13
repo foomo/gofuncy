@@ -106,6 +106,10 @@ func (o *options) tracer() trace.Tracer {
 // Booleans are OR'd, slices are appended, pointers/interfaces use override if non-zero.
 // Group-specific fields (limit, failFast) are not merged.
 func (o options) merge(override options) options {
+	if override.name != "" {
+		o.name = override.name
+	}
+
 	if override.l != nil {
 		o.l = override.l
 	}
@@ -220,6 +224,15 @@ func newGoOverrideOptions(opts []GoOption) options {
 // ------------------------------------------------------------------------------------------------
 // ~ Shared options (Go, NewGroup, Add)
 // ------------------------------------------------------------------------------------------------
+
+// WithName sets the routine name used for context injection, metrics, and
+// tracing. When omitted, each function uses a low-cardinality default
+// (e.g. "gofuncy.go", "gofuncy.do").
+func WithName(name string) baseOpt {
+	return func(o *options) {
+		o.name = name
+	}
+}
 
 // WithLogger configures the logger for the operation.
 func WithLogger(l *slog.Logger) baseOpt {

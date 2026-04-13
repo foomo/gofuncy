@@ -101,8 +101,10 @@ generate:
 .PHONY: audit
 ## Run security audit
 audit:
-	@echo "〉trivy scan"
-	@trivy fs . --format table --severity HIGH,CRITICAL
+	@echo "〉security audit"
+	#@trivy fs . --format table --severity HIGH,CRITICAL
+	@go install golang.org/x/vuln/cmd/govulncheck@latest
+	@go govulncheck ./...
 
 .PHONY: outdated
 ## Show outdated direct dependencies
@@ -116,7 +118,7 @@ outdated:
 ## Show outdated direct dependencies
 upgrade: go.work
 	@echo "〉go mod upgrade"
-	@go get -t -u all
+	@go get -t -u ./...
 
 
 ### Documentation
@@ -145,9 +147,7 @@ godocs:
 ## Show help text
 help:
 	@echo ""
-	@echo "░█▀▀░█▀█░█▀▀░█░█░█▀█░█▀▀░█░█"
-	@echo "░█░█░█░█░█▀▀░█░█░█░█░█░░░░█░"
-	@echo "░▀▀▀░▀▀▀░▀░░░▀▀▀░▀░▀░▀▀▀░░▀░"
+	@echo "goflux"
 	@echo ""
 	@echo "Usage:\n  make [task]"
 	@awk '{ \

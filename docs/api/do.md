@@ -1,7 +1,7 @@
 ---
 prev:
-  text: Wait
-  link: /api/wait
+  text: Start
+  link: /api/start
 next:
   text: Group
   link: /api/group
@@ -14,7 +14,7 @@ Executes a function synchronously with the full middleware chain (resilience, te
 ## Signature
 
 ```go
-func Do(ctx context.Context, name string, fn Func, opts ...GoOption) error
+func Do(ctx context.Context, fn Func, opts ...GoOption) error
 ```
 
 ### Parameters
@@ -22,17 +22,60 @@ func Do(ctx context.Context, name string, fn Func, opts ...GoOption) error
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `ctx` | `context.Context` | Context for the operation. |
-| `name` | `string` | Name for the routine. Used in telemetry spans, metrics, context injection, and logs. |
 | `fn` | `Func` | The function to execute. Signature: `func(ctx context.Context) error` |
 | `opts` | `...GoOption` | Functional options. Accepts any `baseOpt` or `goOnlyOpt`. |
 
-### Accepted Options
+## Options
 
-**Shared** (`baseOpt`): `WithTimeout`, `WithRetry`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithDetachedTrace`, `WithChildTrace`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
+### Naming
 
-**Go-only** (`goOnlyOpt`): `WithCallerSkip`
+| Option | Description |
+|--------|-------------|
+| `WithName(name)` | Custom metric/tracing label. Default: `"gofuncy.do"` |
 
-See the full [Options reference](/api/options).
+### Resilience
+
+| Option | Description |
+|--------|-------------|
+| `WithTimeout(d)` | Per-invocation timeout. Each retry attempt gets a fresh deadline. |
+| `WithRetry(n, opts...)` | Automatic retry with configurable backoff. |
+| `WithCircuitBreaker(cb)` | Fail fast on broken dependencies. Stateful — share across calls. |
+| `WithFallback(fn, opts...)` | Called when the operation fails. Return `nil` to suppress the error. |
+
+### Telemetry
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `WithoutTracing()` | on | Disable span creation. |
+| `WithDetachedTrace()` | varies | Root span linked to parent instead of child span. Default for `Go`/`Start`/`StartWithReady`/`StartWithStop`/`GoWithCancel`. |
+| `WithChildTrace()` | varies | Force child span. Default for `Do`/`Wait`/`NewGroup`. |
+| `WithoutStartedCounter()` | on | Disable started counter. |
+| `WithoutErrorCounter()` | on | Disable error counter. |
+| `WithoutActiveUpDownCounter()` | on | Disable active counter. |
+| `WithDurationHistogram()` | off | Enable duration histogram. |
+| `WithMeterProvider(mp)` | global | Custom OTel meter provider. |
+| `WithTracerProvider(tp)` | global | Custom OTel tracer provider. |
+
+### Concurrency
+
+| Option | Description |
+|--------|-------------|
+| `WithLimiter(sem)` | Shared `*semaphore.Weighted` for cross-callsite concurrency control. |
+
+### Middleware
+
+| Option | Description |
+|--------|-------------|
+| `WithMiddleware(m...)` | Append custom middleware. Applied after resilience, before telemetry. |
+| `WithLogger(l)` | Custom `*slog.Logger` for error reporting. |
+| `WithStallThreshold(d)` | Log a warning if the goroutine runs longer than `d`. |
+| `WithStallHandler(h)` | Custom callback for stall detection. |
+
+### Error Handling
+
+| Option | Description |
+|--------|-------------|
+| `WithCallerSkip(n)` | Adjust stack depth for span caller attributes. |
 
 ## Behavior
 
@@ -53,7 +96,7 @@ See the full [Options reference](/api/options).
 
 ```go
 // Synchronous call with retry and timeout
-err := gofuncy.Do(ctx, "fetch-user", func(ctx context.Context) error {
+err := gofuncy.Do(ctx, func(ctx context.Context) error {
     user, err := api.GetUser(ctx, userID)
     if err != nil {
         return err

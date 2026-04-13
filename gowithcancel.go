@@ -2,17 +2,16 @@ package gofuncy
 
 import (
 	"context"
-	"time"
 )
 
-// Start is like [Go] but blocks until the goroutine has actually started
-// executing. This is useful in tests where you need the routine to be running
-// before proceeding.
-// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.start".
-func Start(ctx context.Context, fn Func, opts ...GoOption) {
+// GoWithCancel spawns a goroutine and returns a stop function. Calling stop cancels
+// the goroutine's context, signaling it to shut down. The stop function is
+// safe to call multiple times.
+// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.gowithcancel".
+func GoWithCancel(ctx context.Context, fn Func, opts ...GoOption) StopFunc {
 	o := newGoOptions(opts)
 	if o.name == "" {
-		o.name = "gofuncy.start"
+		o.name = "gofuncy.gowithcancel"
 	}
 
 	if !o.childTrace {
@@ -20,29 +19,23 @@ func Start(ctx context.Context, fn Func, opts ...GoOption) {
 	}
 
 	run := withContextInjection(fn, o.name)
-	run = buildChain(run, &o, "gofuncy.start", o.callerSkip+3)
+	run = buildChain(run, &o, "gofuncy.gowithcancel", o.callerSkip+3)
+
+	ctx, cancel := context.WithCancel(ctx)
 
 	if o.limiter != nil {
 		if err := o.limiter.Acquire(ctx, 1); err != nil {
 			handleError(ctx, err, o.errorHandler, o.l, o.name)
-			return
+			cancel()
+
+			return StopFunc(func() {})
 		}
 	}
 
-	started := make(chan struct{})
-
 	go func(ctx context.Context) {
-		go func() {
-			time.Sleep(time.Millisecond)
-			close(started)
-		}()
-
 		if o.limiter != nil {
 			defer o.limiter.Release(1)
 		}
-
-		ctx, cancel := context.WithCancel(ctx)
-		defer cancel()
 
 		if ctx.Err() != nil {
 			handleError(ctx, ctx.Err(), o.errorHandler, o.l, o.name)
@@ -54,5 +47,5 @@ func Start(ctx context.Context, fn Func, opts ...GoOption) {
 		}
 	}(ctx)
 
-	<-started
+	return StopFunc(cancel)
 }

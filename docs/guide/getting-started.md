@@ -39,7 +39,7 @@ func main() {
 
 	// Spawn a fire-and-forget goroutine.
 	// Errors are logged via slog by default.
-	gofuncy.Go(ctx, "my-worker", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		fmt.Println("working in the background")
 		return nil
 	})
@@ -71,14 +71,14 @@ import (
 func main() {
 	ctx := context.Background()
 
-	g := gofuncy.NewGroup(ctx, "fetch-all")
+	g := gofuncy.NewGroup(ctx)
 
-	g.Add("users", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		fmt.Println("fetching users")
 		return nil
 	})
 
-	g.Add("orders", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		fmt.Println("fetching orders")
 		return nil
 	})
@@ -111,7 +111,7 @@ func main() {
 
 	words := []string{"hello", "world", "gofuncy"}
 
-	upper, err := gofuncy.Map(ctx, "uppercase", words, func(ctx context.Context, word string) (string, error) {
+	upper, err := gofuncy.Map(ctx, words, func(ctx context.Context, word string) (string, error) {
 		return strings.ToUpper(word), nil
 	})
 	if err != nil {

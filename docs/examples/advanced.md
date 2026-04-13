@@ -27,13 +27,13 @@ import (
 func main() {
 	ctx := context.Background()
 
-	g := gofuncy.NewGroup(ctx, "bounded-group",
+	g := gofuncy.NewGroup(ctx,
 		gofuncy.WithLimit(5),
 		gofuncy.WithFailFast(),
 	)
 
 	for i := range 20 {
-		g.Add(fmt.Sprintf("task-%d", i), func(ctx context.Context) error {
+		g.Add(func(ctx context.Context) error {
 			// Check context before doing work -- fail-fast cancels the context
 			if ctx.Err() != nil {
 				return ctx.Err()
@@ -77,7 +77,7 @@ func main() {
 	limiter := semaphore.NewWeighted(3)
 
 	for i := range 10 {
-		gofuncy.Go(ctx, fmt.Sprintf("worker-%d", i), func(ctx context.Context) error {
+		gofuncy.Go(ctx, func(ctx context.Context) error {
 			fmt.Printf("worker %d started\n", i)
 			time.Sleep(100 * time.Millisecond)
 			fmt.Printf("worker %d done\n", i)
@@ -109,11 +109,12 @@ import (
 func main() {
 	ctx := context.Background()
 
-	gofuncy.Go(ctx, "slow-task", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		// This takes longer than the stall threshold
 		time.Sleep(3 * time.Second)
 		return nil
 	},
+		gofuncy.WithName("slow-task"),
 		gofuncy.WithStallThreshold(1*time.Second),
 		gofuncy.WithStallHandler(func(ctx context.Context, name string, elapsed time.Duration) {
 			fmt.Printf("STALL: %s has been running for %v\n", name, elapsed)
@@ -162,16 +163,16 @@ func loggingMiddleware(next gofuncy.Func) gofuncy.Func {
 func main() {
 	ctx := context.Background()
 
-	g := gofuncy.NewGroup(ctx, "with-logging",
+	g := gofuncy.NewGroup(ctx,
 		gofuncy.WithMiddleware(loggingMiddleware),
 	)
 
-	g.Add("task-a", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		time.Sleep(50 * time.Millisecond)
 		return nil
 	})
 
-	g.Add("task-b", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		time.Sleep(100 * time.Millisecond)
 		return nil
 	})
@@ -205,7 +206,7 @@ func main() {
 
 	ids := []int{1, 2, 3, 4, 5}
 
-	results, err := gofuncy.Map(ctx, "fetch-with-timeout", ids, func(ctx context.Context, id int) (string, error) {
+	results, err := gofuncy.Map(ctx, ids, func(ctx context.Context, id int) (string, error) {
 		// Simulate variable latency
 		time.Sleep(time.Duration(id*100) * time.Millisecond)
 
@@ -243,7 +244,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	gofuncy.Go(ctx, "hot-path", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		// Hot path -- no telemetry overhead
 		return nil
 	},

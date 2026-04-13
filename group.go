@@ -34,10 +34,12 @@ type Group struct {
 }
 
 // NewGroup creates a new Group with the given context and options.
-// The name is used as a metric attribute — use static, low-cardinality values.
-func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
+// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.group".
+func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 	o := newGroupOptions(opts)
-	o.name = name
+	if o.name == "" {
+		o.name = "gofuncy.group"
+	}
 
 	g := &Group{
 		ctx: ctx,
@@ -67,7 +69,12 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 			}
 		}
 
-		g.ctx, g.span = o.tracer().Start(g.ctx, "gofuncy.group "+o.name, startOpts...) //nolint:spancheck
+		spanName := "gofuncy.group"
+		if o.name != "gofuncy.group" {
+			spanName = "gofuncy.group " + o.name
+		}
+
+		g.ctx, g.span = o.tracer().Start(g.ctx, spanName, startOpts...) //nolint:spancheck
 		o.detachedTrace = false
 	}
 
@@ -79,13 +86,16 @@ func NewGroup(ctx context.Context, name string, opts ...GroupOption) *Group {
 // Add spawns a goroutine to execute fn immediately.
 // Per-function opts are merged on top of the group options (additive).
 // User middlewares and panic recovery are applied per fn.
-func (g *Group) Add(name string, fn Func, opts ...GoOption) {
+// Use WithName to set a per-task label; defaults to "gofuncy.group.add".
+func (g *Group) Add(fn Func, opts ...GoOption) {
 	o := g.o
 	if len(opts) > 0 {
 		o = o.merge(newGoOverrideOptions(opts))
 	}
 
-	o.name = name
+	if o.name == "" || o.name == "gofuncy.group" {
+		o.name = "gofuncy.group.add"
+	}
 
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.group.add", 3)

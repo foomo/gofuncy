@@ -17,8 +17,8 @@ func TestFallback_noError(t *testing.T) {
 
 	var fallbackCalled atomic.Bool
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-noop")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return nil
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		fallbackCalled.Store(true)
@@ -32,8 +32,8 @@ func TestFallback_noError(t *testing.T) {
 func TestFallback_suppressesError(t *testing.T) {
 	t.Parallel()
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-suppress")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return fmt.Errorf("transient")
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		return nil
@@ -47,8 +47,8 @@ func TestFallback_replacesError(t *testing.T) {
 
 	replacement := fmt.Errorf("fallback error")
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-replace")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return fmt.Errorf("original")
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		return replacement
@@ -65,8 +65,8 @@ func TestFallback_receivesOriginalError(t *testing.T) {
 
 	var received error
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-receives")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return original
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		received = err
@@ -85,8 +85,8 @@ func TestFallback_doesNotFallbackOnContextCanceled(t *testing.T) {
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 
-	g := gofuncy.NewGroup(ctx, "fallback-ctx")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(ctx)
+	g.Add(func(ctx context.Context) error {
 		return context.Canceled
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		fallbackCalled.Store(true)
@@ -103,8 +103,8 @@ func TestFallback_doesNotFallbackOnPanicError(t *testing.T) {
 
 	var fallbackCalled atomic.Bool
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-panic")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return &gofuncy.PanicError{Value: "boom"}
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		fallbackCalled.Store(true)
@@ -126,7 +126,7 @@ func TestFallback_customFallbackIf(t *testing.T) {
 
 	var fallbackCalled atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-if")
+	g := gofuncy.NewGroup(t.Context())
 
 	fallbackFn := func(ctx context.Context, err error) error {
 		fallbackCalled.Add(1)
@@ -137,11 +137,11 @@ func TestFallback_customFallbackIf(t *testing.T) {
 		return errors.Is(err, retryable)
 	})
 
-	g.Add("task1", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		return retryable
 	}, gofuncy.WithFallback(fallbackFn, fallbackIf))
 
-	g.Add("task2", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		return nonRetryable
 	}, gofuncy.WithFallback(fallbackFn, fallbackIf))
 
@@ -155,8 +155,8 @@ func TestFallback_composesWithRetry(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "fallback-retry")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return fmt.Errorf("persistent")
 	},

@@ -33,16 +33,15 @@ go get github.com/foomo/gofuncy
 ctx := gofuncy.Ctx(context.Background()).Root()
 
 // Fire-and-forget goroutine
-gofuncy.Go(ctx, "worker", func(ctx context.Context) error {
-    // gofuncy.Ctx(ctx).Name() == "worker"
+gofuncy.Go(ctx, func(ctx context.Context) error {
     return doWork(ctx)
 })
 
 // Synchronous execution with middleware chain
-err := gofuncy.Do(ctx, "fetch", fetchData)
+err := gofuncy.Do(ctx, fetchData)
 
 // Goroutine with wait
-wait := gofuncy.Wait(ctx, "processor", processItems)
+wait := gofuncy.Wait(ctx, processItems)
 // ... do other work ...
 err := wait()
 ```
@@ -57,16 +56,25 @@ type Func func(ctx context.Context) error
 
 | Function | Description |
 |----------|-------------|
-| `Go(ctx, name, fn, ...GoOption)` | Fire-and-forget goroutine with error logging |
-| `Do(ctx, name, fn, ...GoOption)` | Synchronous execution, returns error directly |
-| `Wait(ctx, name, fn, ...GoOption)` | Goroutine that returns a wait function |
-| `NewGroup(ctx, name, ...GroupOption)` | Concurrent group with shared lifecycle |
-| `All(ctx, name, items, fn, ...GroupOption)` | Execute fn for each item concurrently |
-| `Map(ctx, name, items, fn, ...GroupOption)` | Transform items concurrently, preserving order |
+| `Go(ctx, fn, ...GoOption)` | Fire-and-forget goroutine with error logging |
+| `Start(ctx, fn, ...GoOption)` | Like Go, blocks until the goroutine is running |
+| `StartWithReady(ctx, fn, ...GoOption)` | Like Go, blocks until fn signals readiness |
+| `StartWithStop(ctx, fn, ...GoOption)` | Like Go, goroutine receives a stop function to cancel itself |
+| `GoWithCancel(ctx, fn, ...GoOption)` | Like Go, returns a stop function |
+| `Do(ctx, fn, ...GoOption)` | Synchronous execution, returns error directly |
+| `Wait(ctx, fn, ...GoOption)` | Goroutine that returns a wait function |
+| `WaitWithStop(ctx, fn, ...GoOption)` | Like Wait, goroutine receives a stop function |
+| `WaitWithReady(ctx, fn, ...GoOption)` | Like Wait, blocks until fn signals readiness |
+| `NewGroup(ctx, ...GroupOption)` | Concurrent group with shared lifecycle |
+| `All(ctx, items, fn, ...GroupOption)` | Execute fn for each item concurrently |
+| `Map(ctx, items, fn, ...GroupOption)` | Transform items concurrently, preserving order |
 
 ## Options
 
 ```go
+// Naming (optional)
+gofuncy.WithName("my-routine")
+
 // Resilience
 gofuncy.WithTimeout(5 * time.Second)
 gofuncy.WithRetry(3)
@@ -105,7 +113,7 @@ The `channel` subpackage provides a generic, observable channel:
 ```go
 import "github.com/foomo/gofuncy/channel"
 
-ch := channel.New[string]("events", channel.WithBuffer[string](100))
+ch := channel.New[string](channel.WithBuffer[string](100))
 defer ch.Close()
 
 ch.Send(ctx, "hello", "world")

@@ -120,14 +120,23 @@ func WithTracing[T any]() Option[T] {
 	}
 }
 
+// WithName sets the channel name used for metrics and tracing.
+// Defaults to "gofuncy.channel" when omitted.
+func WithName[T any](name string) Option[T] {
+	return func(c *Channel[T]) {
+		c.name = name
+	}
+}
+
 // ------------------------------------------------------------------------------------------------
 // ~ Constructor
 // ------------------------------------------------------------------------------------------------
 
-// New creates a new Channel with the given name and options.
-func New[T any](name string, opts ...Option[T]) *Channel[T] {
+// New creates a new Channel with the given options.
+// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.channel".
+func New[T any](opts ...Option[T]) *Channel[T] {
 	c := &Channel[T]{
-		name:                name,
+		name:                "gofuncy.channel",
 		l:                   slog.Default(),
 		chansCounter:        true,
 		messagesSentCounter: true,
@@ -193,8 +202,14 @@ func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 	}
 
 	var span trace.Span
+
 	if c.tracing {
-		ctx, span = c.tracer.Start(ctx, "gofuncy.channel.send "+c.name,
+		spanName := "gofuncy.channel.send"
+		if c.name != "gofuncy.channel" {
+			spanName = "gofuncy.channel.send " + c.name
+		}
+
+		ctx, span = c.tracer.Start(ctx, spanName,
 			trace.WithSpanKind(trace.SpanKindProducer),
 			trace.WithAttributes(
 				semconv.ChanName(c.name),

@@ -27,11 +27,12 @@ func TestGo_detachedTraceByDefault(t *testing.T) {
 
 	done := make(chan struct{})
 
-	gofuncy.Go(ctx, "detached-default",
+	gofuncy.Go(ctx,
 		func(ctx context.Context) error {
 			close(done)
 			return nil
 		},
+		gofuncy.WithName("detached-default"),
 		gofuncy.WithTracerProvider(tp),
 	)
 
@@ -71,11 +72,12 @@ func TestGo_withChildTrace(t *testing.T) {
 
 	done := make(chan struct{})
 
-	gofuncy.Go(ctx, "child-override",
+	gofuncy.Go(ctx,
 		func(ctx context.Context) error {
 			close(done)
 			return nil
 		},
+		gofuncy.WithName("child-override"),
 		gofuncy.WithTracerProvider(tp),
 		gofuncy.WithChildTrace(),
 	)
@@ -110,11 +112,12 @@ func TestGo_detachedTraceNoParent(t *testing.T) {
 	done := make(chan struct{})
 
 	// No parent span in context
-	gofuncy.Go(t.Context(), "no-parent",
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
 			close(done)
 			return nil
 		},
+		gofuncy.WithName("no-parent"),
 		gofuncy.WithTracerProvider(tp),
 	)
 
@@ -147,8 +150,9 @@ func TestDo_childTraceByDefault(t *testing.T) {
 	tracer := tp.Tracer("test")
 	ctx, parentSpan := tracer.Start(t.Context(), "parent")
 
-	err := gofuncy.Do(ctx, "child-default",
+	err := gofuncy.Do(ctx,
 		func(ctx context.Context) error { return nil },
+		gofuncy.WithName("child-default"),
 		gofuncy.WithTracerProvider(tp),
 	)
 	require.NoError(t, err)
@@ -174,8 +178,9 @@ func TestDo_withDetachedTrace(t *testing.T) {
 	tracer := tp.Tracer("test")
 	ctx, parentSpan := tracer.Start(t.Context(), "parent")
 
-	err := gofuncy.Do(ctx, "detached-opt-in",
+	err := gofuncy.Do(ctx,
 		func(ctx context.Context) error { return nil },
+		gofuncy.WithName("detached-opt-in"),
 		gofuncy.WithTracerProvider(tp),
 		gofuncy.WithDetachedTrace(),
 	)
@@ -207,13 +212,14 @@ func TestGroup_withDetachedTrace(t *testing.T) {
 	tracer := tp.Tracer("test")
 	ctx, parentSpan := tracer.Start(t.Context(), "parent")
 
-	g := gofuncy.NewGroup(ctx, "detached-group",
+	g := gofuncy.NewGroup(ctx,
+		gofuncy.WithName("detached-group"),
 		gofuncy.WithTracerProvider(tp),
 		gofuncy.WithDetachedTrace(),
 	)
 
-	g.Add("task-a", func(ctx context.Context) error { return nil })
-	g.Add("task-b", func(ctx context.Context) error { return nil })
+	g.Add(func(ctx context.Context) error { return nil }, gofuncy.WithName("task-a"))
+	g.Add(func(ctx context.Context) error { return nil }, gofuncy.WithName("task-b"))
 
 	err := g.Wait()
 	require.NoError(t, err)
@@ -251,11 +257,12 @@ func TestGroup_childTraceByDefault(t *testing.T) {
 	tracer := tp.Tracer("test")
 	ctx, parentSpan := tracer.Start(t.Context(), "parent")
 
-	g := gofuncy.NewGroup(ctx, "child-group",
+	g := gofuncy.NewGroup(ctx,
+		gofuncy.WithName("child-group"),
 		gofuncy.WithTracerProvider(tp),
 	)
 
-	g.Add("task", func(ctx context.Context) error { return nil })
+	g.Add(func(ctx context.Context) error { return nil })
 
 	err := g.Wait()
 	require.NoError(t, err)

@@ -28,7 +28,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	gofuncy.Go(ctx, "fire-and-forget", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		fmt.Println("running in the background")
 		return nil
 	})
@@ -56,9 +56,10 @@ import (
 func main() {
 	ctx := context.Background()
 
-	gofuncy.Go(ctx, "custom-handler", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		return errors.New("something went wrong")
 	},
+		gofuncy.WithName("custom-handler"),
 		gofuncy.WithErrorHandler(func(ctx context.Context, err error) {
 			fmt.Printf("[%s] error: %v\n", gofuncy.NameFromContext(ctx), err)
 		}),
@@ -90,12 +91,12 @@ func main() {
 	var orders []string
 
 	// Launch two async calls
-	waitUser := gofuncy.Wait(ctx, "fetch-user", func(ctx context.Context) error {
+	waitUser := gofuncy.Wait(ctx, func(ctx context.Context) error {
 		user = "Alice"
 		return nil
 	})
 
-	waitOrders := gofuncy.Wait(ctx, "fetch-orders", func(ctx context.Context) error {
+	waitOrders := gofuncy.Wait(ctx, func(ctx context.Context) error {
 		orders = []string{"order-1", "order-2"}
 		return nil
 	})
@@ -133,7 +134,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	err := gofuncy.Do(ctx, "fetch-config", func(ctx context.Context) error {
+	err := gofuncy.Do(ctx, func(ctx context.Context) error {
 		// Simulate a flaky call
 		return fmt.Errorf("connection refused")
 	},
@@ -164,19 +165,19 @@ import (
 func main() {
 	ctx := context.Background()
 
-	g := gofuncy.NewGroup(ctx, "parallel-tasks")
+	g := gofuncy.NewGroup(ctx)
 
-	g.Add("task-a", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		fmt.Println("task A")
 		return nil
 	})
 
-	g.Add("task-b", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		fmt.Println("task B")
 		return errors.New("task B failed")
 	})
 
-	g.Add("task-c", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		fmt.Println("task C")
 		return nil
 	})
@@ -212,7 +213,7 @@ func main() {
 
 	items := []string{"alpha", "bravo", "charlie", "delta", "echo"}
 
-	err := gofuncy.All(ctx, "process-items", items, func(ctx context.Context, item string) error {
+	err := gofuncy.All(ctx, items, func(ctx context.Context, item string) error {
 		fmt.Printf("processing %s\n", item)
 		time.Sleep(50 * time.Millisecond) // simulate work
 		return nil
@@ -242,7 +243,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	ch := channel.New[int]("numbers", channel.WithBuffer[int](5))
+	ch := channel.New[int](channel.WithBuffer[int](5))
 
 	// Send multiple values at once
 	if err := ch.Send(ctx, 1, 2, 3, 4, 5); err != nil {
@@ -281,7 +282,7 @@ func main() {
 
 	numbers := []int{1, 2, 3, 4, 5}
 
-	squares, err := gofuncy.Map(ctx, "square", numbers, func(ctx context.Context, n int) (int, error) {
+	squares, err := gofuncy.Map(ctx, numbers, func(ctx context.Context, n int) (int, error) {
 		return n * n, nil
 	})
 	if err != nil {
@@ -290,5 +291,44 @@ func main() {
 	}
 
 	fmt.Println(squares) // [1 4 9 16 25]
+}
+```
+
+## Stoppable Goroutine with GoWithCancel
+
+Spawn a goroutine and stop it later.
+
+```go
+package main
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/foomo/gofuncy"
+)
+
+func main() {
+	stop := gofuncy.GoWithCancel(context.Background(), func(ctx context.Context) error {
+		for {
+			select {
+			case <-ctx.Done():
+				fmt.Println("stopped")
+				return nil
+			case <-time.After(100 * time.Millisecond):
+				fmt.Println("tick")
+			}
+		}
+	})
+
+	time.Sleep(350 * time.Millisecond)
+	stop()
+	time.Sleep(50 * time.Millisecond)
+	// Output:
+	// tick
+	// tick
+	// tick
+	// stopped
 }
 ```

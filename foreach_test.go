@@ -16,7 +16,7 @@ import (
 func ExampleAll() {
 	urls := []string{"https://a.test", "https://b.test", "https://c.test"}
 
-	err := gofuncy.All(context.Background(), "fetch", urls,
+	err := gofuncy.All(context.Background(), urls,
 		func(ctx context.Context, url string) error {
 			fmt.Println("fetching", url)
 			return nil
@@ -38,7 +38,7 @@ func TestAll_basic(t *testing.T) {
 
 	items := []int{1, 2, 3, 4, 5}
 
-	err := gofuncy.All(t.Context(), "basic", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), items, func(ctx context.Context, item int) error {
 		count.Add(1)
 		return nil
 	})
@@ -50,7 +50,7 @@ func TestAll_basic(t *testing.T) {
 func TestAll_empty(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.All(t.Context(), "empty", []int{}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), []int{}, func(ctx context.Context, item int) error {
 		t.Fatal("should not be called")
 		return nil
 	})
@@ -66,7 +66,7 @@ func TestAll_errors(t *testing.T) {
 
 	items := []int{1, 2, 3}
 
-	err := gofuncy.All(t.Context(), "with-errors", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), items, func(ctx context.Context, item int) error {
 		switch item {
 		case 1:
 			return errA
@@ -87,7 +87,7 @@ func TestAll_failFast(t *testing.T) {
 
 	started := make(chan struct{})
 
-	err := gofuncy.All(t.Context(), "fail-fast", []int{1, 2},
+	err := gofuncy.All(t.Context(), []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)
@@ -121,7 +121,7 @@ func TestAll_withLimit(t *testing.T) {
 		items[i] = i
 	}
 
-	err := gofuncy.All(t.Context(), "with-limit", items,
+	err := gofuncy.All(t.Context(), items,
 		func(ctx context.Context, item int) error {
 			cur := active.Add(1)
 
@@ -149,7 +149,7 @@ func TestAll_singleItem(t *testing.T) {
 
 	var got int
 
-	err := gofuncy.All(t.Context(), "single", []int{42}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), []int{42}, func(ctx context.Context, item int) error {
 		got = item
 		return nil
 	})
@@ -161,7 +161,7 @@ func TestAll_singleItem(t *testing.T) {
 func TestAll_panic(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.All(t.Context(), "panic", []int{1}, func(ctx context.Context, item int) error {
+	err := gofuncy.All(t.Context(), []int{1}, func(ctx context.Context, item int) error {
 		panic("foreach panic")
 	})
 
@@ -180,7 +180,7 @@ func TestAll_contextCancel(t *testing.T) {
 
 	started := make(chan struct{})
 
-	err := gofuncy.All(ctx, "ctx-cancel", []int{1, 2},
+	err := gofuncy.All(ctx, []int{1, 2},
 		func(ctx context.Context, item int) error {
 			if item == 1 {
 				close(started)

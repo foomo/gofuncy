@@ -13,7 +13,7 @@ import (
 )
 
 func ExampleDo() {
-	err := gofuncy.Do(context.Background(), "greet", func(ctx context.Context) error {
+	err := gofuncy.Do(context.Background(), func(ctx context.Context) error {
 		fmt.Println("hello")
 		return nil
 	})
@@ -27,7 +27,7 @@ func ExampleDo() {
 func ExampleDo_retry() {
 	var attempts atomic.Int32
 
-	err := gofuncy.Do(context.Background(), "flaky-call",
+	err := gofuncy.Do(context.Background(),
 		func(ctx context.Context) error {
 			n := attempts.Add(1)
 			if n < 3 {
@@ -49,7 +49,7 @@ func ExampleDo_retry() {
 }
 
 func ExampleDo_fallback() {
-	err := gofuncy.Do(context.Background(), "with-fallback",
+	err := gofuncy.Do(context.Background(),
 		func(ctx context.Context) error {
 			return fmt.Errorf("primary failed")
 		},
@@ -68,7 +68,7 @@ func ExampleDo_fallback() {
 func TestDo_success(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.Do(t.Context(), "ok", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		return nil
 	})
 
@@ -78,7 +78,7 @@ func TestDo_success(t *testing.T) {
 func TestDo_returnsError(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.Do(t.Context(), "fail", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		return fmt.Errorf("boom")
 	})
 
@@ -88,7 +88,7 @@ func TestDo_returnsError(t *testing.T) {
 func TestDo_panicRecovery(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.Do(t.Context(), "panic", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		panic("oops")
 	})
 
@@ -102,7 +102,7 @@ func TestDo_withRetry(t *testing.T) {
 
 	var calls atomic.Int32
 
-	err := gofuncy.Do(t.Context(), "retry", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		if calls.Add(1) < 3 {
 			return fmt.Errorf("transient")
 		}
@@ -117,7 +117,7 @@ func TestDo_withRetry(t *testing.T) {
 func TestDo_withTimeout(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.Do(t.Context(), "timeout", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		<-ctx.Done()
 		return ctx.Err()
 	}, gofuncy.WithTimeout(10*time.Millisecond))
@@ -132,13 +132,13 @@ func TestDo_withCircuitBreaker(t *testing.T) {
 
 	// Trip the circuit
 	for range 2 {
-		_ = gofuncy.Do(t.Context(), "trip", func(ctx context.Context) error {
+		_ = gofuncy.Do(t.Context(), func(ctx context.Context) error {
 			return fmt.Errorf("fail")
 		}, gofuncy.WithCircuitBreaker(cb))
 	}
 
 	// Next call should be rejected
-	err := gofuncy.Do(t.Context(), "open", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		t.Fatal("should not be called")
 		return nil
 	}, gofuncy.WithCircuitBreaker(cb))
@@ -149,7 +149,7 @@ func TestDo_withCircuitBreaker(t *testing.T) {
 func TestDo_withFallback(t *testing.T) {
 	t.Parallel()
 
-	err := gofuncy.Do(t.Context(), "fallback", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		return fmt.Errorf("original")
 	}, gofuncy.WithFallback(func(ctx context.Context, err error) error {
 		return nil
@@ -165,7 +165,7 @@ func TestDo_fullResilienceChain(t *testing.T) {
 
 	cb := gofuncy.NewCircuitBreaker(gofuncy.CircuitBreakerThreshold(10))
 
-	err := gofuncy.Do(t.Context(), "full-chain", func(ctx context.Context) error {
+	err := gofuncy.Do(t.Context(), func(ctx context.Context) error {
 		calls.Add(1)
 		return fmt.Errorf("fail")
 	},

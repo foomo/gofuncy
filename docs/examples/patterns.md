@@ -34,7 +34,7 @@ func main() {
 
 	// Fan out: fetch all orders concurrently (max 3 at a time)
 	// Fan in: collect results in order
-	orders, err := gofuncy.Map(ctx, "fetch-orders", orderIDs, func(ctx context.Context, id int) (Order, error) {
+	orders, err := gofuncy.Map(ctx, orderIDs, func(ctx context.Context, id int) (Order, error) {
 		// Simulate fetching from a database or API
 		return Order{ID: id, Total: float64(id) * 9.99}, nil
 	},
@@ -72,7 +72,7 @@ func main() {
 	raw := []string{"  hello  ", "  WORLD  ", "  GoFuncy  "}
 
 	// Stage 1: trim whitespace
-	trimmed, err := gofuncy.Map(ctx, "trim", raw, func(ctx context.Context, s string) (string, error) {
+	trimmed, err := gofuncy.Map(ctx, raw, func(ctx context.Context, s string) (string, error) {
 		return strings.TrimSpace(s), nil
 	})
 	if err != nil {
@@ -81,7 +81,7 @@ func main() {
 	}
 
 	// Stage 2: lowercase
-	lowered, err := gofuncy.Map(ctx, "lowercase", trimmed, func(ctx context.Context, s string) (string, error) {
+	lowered, err := gofuncy.Map(ctx, trimmed, func(ctx context.Context, s string) (string, error) {
 		return strings.ToLower(s), nil
 	})
 	if err != nil {
@@ -114,11 +114,11 @@ func main() {
 
 	var result string
 
-	g := gofuncy.NewGroup(ctx, "timeout-fallback",
+	g := gofuncy.NewGroup(ctx,
 		gofuncy.WithFailFast(),
 	)
 
-	g.Add("api-call", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		// Simulate a slow API call
 		time.Sleep(2 * time.Second)
 		if ctx.Err() != nil {
@@ -166,10 +166,10 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer stop()
 
-	g := gofuncy.NewGroup(ctx, "workers")
+	g := gofuncy.NewGroup(ctx)
 
 	for i := range 3 {
-		g.Add(fmt.Sprintf("worker-%d", i), func(ctx context.Context) error {
+		g.Add(func(ctx context.Context) error {
 			for {
 				select {
 				case <-ctx.Done():
@@ -214,7 +214,7 @@ func main() {
 	}
 
 	// Process all items, 10 at a time
-	err := gofuncy.All(ctx, "batch-process", items, func(ctx context.Context, item int) error {
+	err := gofuncy.All(ctx, items, func(ctx context.Context, item int) error {
 		// Simulate processing
 		if item%25 == 0 {
 			fmt.Printf("processing item %d\n", item)
@@ -253,21 +253,21 @@ func main() {
 	var totalOrders atomic.Int64
 	var totalRevenue atomic.Int64
 
-	g := gofuncy.NewGroup(ctx, "aggregate-stats")
+	g := gofuncy.NewGroup(ctx)
 
-	g.Add("count-users", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		// Fetch from users service
 		totalUsers.Store(1500)
 		return nil
 	})
 
-	g.Add("count-orders", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		// Fetch from orders service
 		totalOrders.Store(3200)
 		return nil
 	})
 
-	g.Add("count-revenue", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		// Fetch from billing service
 		totalRevenue.Store(450000)
 		return nil

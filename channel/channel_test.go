@@ -13,7 +13,7 @@ import (
 )
 
 func ExampleNew() {
-	ch := channel.New[string]("events", channel.WithBuffer[string](3))
+	ch := channel.New[string](channel.WithBuffer[string](3))
 	defer ch.Close()
 
 	_ = ch.Send(context.Background(), "hello", "world")
@@ -28,7 +28,7 @@ func ExampleNew() {
 func TestChannel_sendAndReceive(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("test", channel.WithBuffer[int](1))
+	ch := channel.New[int](channel.WithBuffer[int](1))
 
 	require.NoError(t, ch.Send(t.Context(), 42))
 
@@ -42,7 +42,7 @@ func TestChannel_sendAndReceive(t *testing.T) {
 func TestChannel_sendMultipleValues(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[string]("multi", channel.WithBuffer[string](3))
+	ch := channel.New[string](channel.WithBuffer[string](3))
 
 	require.NoError(t, ch.Send(t.Context(), "a", "b", "c"))
 
@@ -60,7 +60,7 @@ func TestChannel_sendMultipleValues(t *testing.T) {
 func TestChannel_unbufferedSendReceive(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("unbuffered")
+	ch := channel.New[int]()
 
 	var received int
 
@@ -83,7 +83,7 @@ func TestChannel_unbufferedSendReceive(t *testing.T) {
 func TestChannel_rangeReceive(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("range", channel.WithBuffer[int](3))
+	ch := channel.New[int](channel.WithBuffer[int](3))
 
 	require.NoError(t, ch.Send(t.Context(), 1, 2, 3))
 	ch.Close()
@@ -99,7 +99,7 @@ func TestChannel_rangeReceive(t *testing.T) {
 func TestChannel_sendOnClosedChannel(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("closed")
+	ch := channel.New[int]()
 	ch.Close()
 
 	err := ch.Send(t.Context(), 1)
@@ -109,7 +109,7 @@ func TestChannel_sendOnClosedChannel(t *testing.T) {
 func TestChannel_doubleCloseIsIdempotent(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("double-close")
+	ch := channel.New[int]()
 
 	ch.Close()
 	assert.NotPanics(t, func() {
@@ -120,7 +120,7 @@ func TestChannel_doubleCloseIsIdempotent(t *testing.T) {
 func TestChannel_sendContextCancelled(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("ctx-cancel")
+	ch := channel.New[int]()
 
 	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
@@ -134,7 +134,7 @@ func TestChannel_sendContextCancelled(t *testing.T) {
 func TestChannel_sendContextDeadlineExceeded(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("ctx-deadline")
+	ch := channel.New[int]()
 
 	ctx, cancel := context.WithTimeout(t.Context(), 10*time.Millisecond)
 	defer cancel()
@@ -148,7 +148,7 @@ func TestChannel_sendContextDeadlineExceeded(t *testing.T) {
 func TestChannel_concurrentSendAndClose(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("concurrent-close", channel.WithBuffer[int](100))
+	ch := channel.New[int](channel.WithBuffer[int](100))
 
 	var wg sync.WaitGroup
 	for range 10 {
@@ -172,7 +172,7 @@ func TestChannel_concurrentSendAndClose(t *testing.T) {
 func TestChannel_lenAndCap(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("len-cap", channel.WithBuffer[int](10))
+	ch := channel.New[int](channel.WithBuffer[int](10))
 
 	assert.Equal(t, 0, ch.Len())
 	assert.Equal(t, 10, ch.Cap())
@@ -188,7 +188,7 @@ func TestChannel_lenAndCap(t *testing.T) {
 func TestChannel_name(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("my-channel")
+	ch := channel.New[int](channel.WithName[int]("my-channel"))
 	assert.Equal(t, "my-channel", ch.Name())
 
 	ch.Close()
@@ -197,8 +197,7 @@ func TestChannel_name(t *testing.T) {
 func TestChannel_withoutChansCounter(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("no-chans",
-		channel.WithBuffer[int](5),
+	ch := channel.New[int](channel.WithBuffer[int](5),
 		channel.WithoutChansCounter[int](),
 	)
 
@@ -211,8 +210,7 @@ func TestChannel_withoutChansCounter(t *testing.T) {
 func TestChannel_withoutMessagesCounter(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("no-messages",
-		channel.WithBuffer[int](5),
+	ch := channel.New[int](channel.WithBuffer[int](5),
 		channel.WithoutMessagesSentCounter[int](),
 	)
 
@@ -225,8 +223,7 @@ func TestChannel_withoutMessagesCounter(t *testing.T) {
 func TestChannel_withDurationHistogram(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("with-duration",
-		channel.WithBuffer[int](5),
+	ch := channel.New[int](channel.WithBuffer[int](5),
 		channel.WithDurationHistogram[int](),
 	)
 
@@ -239,8 +236,7 @@ func TestChannel_withDurationHistogram(t *testing.T) {
 func TestChannel_withTracing(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("with-tracing",
-		channel.WithBuffer[int](5),
+	ch := channel.New[int](channel.WithBuffer[int](5),
 		channel.WithTracing[int](),
 	)
 
@@ -253,8 +249,7 @@ func TestChannel_withTracing(t *testing.T) {
 func TestChannel_allTelemetryDisabled(t *testing.T) {
 	t.Parallel()
 
-	ch := channel.New[int]("bare",
-		channel.WithBuffer[int](5),
+	ch := channel.New[int](channel.WithBuffer[int](5),
 		channel.WithoutChansCounter[int](),
 		channel.WithoutMessagesSentCounter[int](),
 	)
@@ -285,8 +280,7 @@ func BenchmarkChannel_rawChan(b *testing.B) {
 }
 
 func BenchmarkChannel_noTelemetry(b *testing.B) {
-	ch := channel.New[int]("bench-bare",
-		channel.WithBuffer[int](1),
+	ch := channel.New[int](channel.WithBuffer[int](1),
 		channel.WithoutChansCounter[int](),
 		channel.WithoutMessagesSentCounter[int](),
 	)
@@ -304,9 +298,7 @@ func BenchmarkChannel_noTelemetry(b *testing.B) {
 }
 
 func BenchmarkChannel_defaultTelemetry(b *testing.B) {
-	ch := channel.New[int]("bench-default",
-		channel.WithBuffer[int](1),
-	)
+	ch := channel.New[int](channel.WithBuffer[int](1))
 	ctx := context.Background()
 
 	b.Cleanup(func() {
@@ -321,8 +313,7 @@ func BenchmarkChannel_defaultTelemetry(b *testing.B) {
 }
 
 func BenchmarkChannel_allFeatures(b *testing.B) {
-	ch := channel.New[int]("bench-all",
-		channel.WithBuffer[int](1),
+	ch := channel.New[int](channel.WithBuffer[int](1),
 		channel.WithDurationHistogram[int](),
 		channel.WithTracing[int](),
 	)

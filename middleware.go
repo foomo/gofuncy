@@ -125,7 +125,11 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 	}
 
 	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
-	spanName := spanPrefix + " " + o.name
+
+	spanName := spanPrefix
+	if o.name != spanPrefix {
+		spanName = spanPrefix + " " + o.name
+	}
 
 	return func(ctx context.Context) error {
 		attrs := traceAttrs

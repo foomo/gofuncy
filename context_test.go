@@ -14,13 +14,13 @@ import (
 func ExampleCtx() {
 	done := make(chan struct{})
 
-	gofuncy.Go(context.Background(), "worker", func(ctx context.Context) error {
+	gofuncy.Go(context.Background(), func(ctx context.Context) error {
 		defer close(done)
 
 		fmt.Println("name:", gofuncy.NameFromContext(ctx))
 
 		return nil
-	})
+	}, gofuncy.WithName("worker"))
 
 	<-done
 	// Output:
@@ -52,9 +52,9 @@ func TestContext_nestedGoRoutines(t *testing.T) {
 	ch := make(chan result, 1)
 	done := make(chan struct{})
 
-	gofuncy.Go(t.Context(), "parent",
+	gofuncy.Go(t.Context(),
 		func(ctx context.Context) error {
-			gofuncy.Go(ctx, "child",
+			gofuncy.Go(ctx,
 				func(ctx context.Context) error {
 					ch <- result{
 						name:   gofuncy.NameFromContext(ctx),
@@ -65,12 +65,14 @@ func TestContext_nestedGoRoutines(t *testing.T) {
 
 					return nil
 				},
+				gofuncy.WithName("child"),
 			)
 
 			<-done
 
 			return nil
 		},
+		gofuncy.WithName("parent"),
 	)
 
 	select {
@@ -91,7 +93,7 @@ func TestContext_existingDeadlineShorterThanTimeout(t *testing.T) {
 	ctx, cancel := context.WithTimeout(t.Context(), 20*time.Millisecond)
 	defer cancel()
 
-	gofuncy.Go(ctx, "deadline-test",
+	gofuncy.Go(ctx,
 		func(ctx context.Context) error {
 			<-ctx.Done()
 			return ctx.Err()

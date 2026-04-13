@@ -17,7 +17,7 @@ Lives in the `github.com/foomo/gofuncy/channel` subpackage.
 ## Signature
 
 ```go
-func New[T any](name string, opts ...Option[T]) *Channel[T]
+func New[T any](opts ...Option[T]) *Channel[T]
 ```
 
 ### Type Parameters
@@ -30,7 +30,6 @@ func New[T any](name string, opts ...Option[T]) *Channel[T]
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `name` | `string` | Name for the channel. Used in telemetry metrics and traces. |
 | `opts` | `...Option[T]` | Functional options to configure the channel. |
 
 ## Options
@@ -39,6 +38,7 @@ func New[T any](name string, opts ...Option[T]) *Channel[T]
 
 | Feature | Default | Option |
 |---------|---------|--------|
+| Name | `"gofuncy.channel"` | `WithName[T](name)` |
 | Buffer size | `0` (unbuffered) | `WithBuffer[T](size)` |
 | Logger | `slog.Default()` | `WithLogger[T](l)` |
 | Chans counter (`gofuncy.chans.current`) | **on** | `WithoutChansCounter[T]()` |
@@ -119,10 +119,10 @@ func main() {
 	ctx := context.Background()
 
 	// Create a buffered channel with default telemetry (counters on)
-	ch := channel.New[string]("events", channel.WithBuffer[string](10))
+	ch := channel.New[string](channel.WithBuffer[string](10))
 
 	// Producer
-	gofuncy.Go(ctx, "producer", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		defer ch.Close()
 
 		for i := range 5 {

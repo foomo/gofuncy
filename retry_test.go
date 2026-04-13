@@ -18,8 +18,8 @@ func TestRetry_succeedsFirstAttempt(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-first")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return nil
 	}, gofuncy.WithRetry(3, gofuncy.RetryBackoff(gofuncy.BackoffConstant(0))))
@@ -33,8 +33,8 @@ func TestRetry_failsThenSucceeds(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-recover")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		if calls.Add(1) < 3 {
 			return fmt.Errorf("transient error")
 		}
@@ -51,8 +51,8 @@ func TestRetry_exhaustsAttempts(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-exhaust")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return fmt.Errorf("persistent error")
 	}, gofuncy.WithRetry(3, gofuncy.RetryBackoff(gofuncy.BackoffConstant(0))))
@@ -69,8 +69,8 @@ func TestRetry_respectsContextCancellation(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(ctx, "retry-cancel")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(ctx)
+	g.Add(func(ctx context.Context) error {
 		if calls.Add(1) == 2 {
 			cancel()
 		}
@@ -88,8 +88,8 @@ func TestRetry_doesNotRetryPanicError(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-panic")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return &gofuncy.PanicError{Value: "boom"}
 	}, gofuncy.WithRetry(3, gofuncy.RetryBackoff(gofuncy.BackoffConstant(0))))
@@ -106,8 +106,8 @@ func TestRetry_doesNotRetryDeadlineExceeded(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-deadline")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return context.DeadlineExceeded
 	}, gofuncy.WithRetry(3, gofuncy.RetryBackoff(gofuncy.BackoffConstant(0))))
@@ -125,8 +125,8 @@ func TestRetry_customRetryIf(t *testing.T) {
 	retryable := fmt.Errorf("retryable")
 	nonRetryable := fmt.Errorf("non-retryable")
 
-	g := gofuncy.NewGroup(t.Context(), "retry-custom-if")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		if calls.Add(1) == 1 {
 			return retryable
 		}
@@ -149,8 +149,8 @@ func TestRetry_customBackoff(t *testing.T) {
 
 	start := time.Now()
 
-	g := gofuncy.NewGroup(t.Context(), "retry-backoff")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return fmt.Errorf("fail")
 	}, gofuncy.WithRetry(3,
 		gofuncy.RetryBackoff(gofuncy.BackoffConstant(20*time.Millisecond)),
@@ -168,8 +168,8 @@ func TestRetry_onRetryCallback(t *testing.T) {
 
 	var retryAttempts []int
 
-	g := gofuncy.NewGroup(t.Context(), "retry-callback")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return fmt.Errorf("fail")
 	}, gofuncy.WithRetry(4,
 		gofuncy.RetryBackoff(gofuncy.BackoffConstant(0)),
@@ -189,8 +189,8 @@ func TestRetry_composesWithTimeout(t *testing.T) {
 	var calls atomic.Int32
 
 	// Per-attempt timeout of 20ms — each slow attempt is killed, but retry continues
-	g := gofuncy.NewGroup(t.Context(), "retry-timeout")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		n := calls.Add(1)
 		if n < 3 {
 			// First two attempts: block until per-attempt timeout
@@ -218,10 +218,10 @@ func TestRetry_composesWithFailFast(t *testing.T) {
 
 	started := make(chan struct{})
 
-	g := gofuncy.NewGroup(t.Context(), "retry-failfast", gofuncy.WithFailFast())
+	g := gofuncy.NewGroup(t.Context(), gofuncy.WithFailFast())
 
 	// This task retries forever until context is cancelled
-	g.Add("retrying", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		if retryCalls.Add(1) == 1 {
 			close(started)
 		}
@@ -230,7 +230,7 @@ func TestRetry_composesWithFailFast(t *testing.T) {
 	}, gofuncy.WithRetry(100, gofuncy.RetryBackoff(gofuncy.BackoffConstant(5*time.Millisecond))))
 
 	// This task waits for the other to start, then fails immediately
-	g.Add("fatal", func(ctx context.Context) error {
+	g.Add(func(ctx context.Context) error {
 		<-started
 		return fmt.Errorf("fatal error")
 	})
@@ -246,8 +246,8 @@ func TestRetry_maxAttemptsOne(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-one")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return fmt.Errorf("fail")
 	}, gofuncy.WithRetry(1))
@@ -262,8 +262,8 @@ func TestRetry_maxAttemptsZeroDefaultsToOne(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-zero")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		calls.Add(1)
 		return fmt.Errorf("fail")
 	}, gofuncy.WithRetry(0))
@@ -278,8 +278,8 @@ func TestRetry_viaMiddleware(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "retry-mw")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		if calls.Add(1) < 3 {
 			return fmt.Errorf("transient")
 		}

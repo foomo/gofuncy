@@ -15,8 +15,8 @@ import (
 func TestTimeout_completesBeforeDeadline(t *testing.T) {
 	t.Parallel()
 
-	g := gofuncy.NewGroup(t.Context(), "timeout-ok")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return nil
 	}, gofuncy.WithTimeout(time.Second))
 
@@ -26,8 +26,8 @@ func TestTimeout_completesBeforeDeadline(t *testing.T) {
 func TestTimeout_exceedsDeadline(t *testing.T) {
 	t.Parallel()
 
-	g := gofuncy.NewGroup(t.Context(), "timeout-exceed")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		<-ctx.Done()
 		return ctx.Err()
 	}, gofuncy.WithTimeout(10*time.Millisecond))
@@ -41,8 +41,8 @@ func TestTimeout_eachAttemptGetsOwnDeadline(t *testing.T) {
 
 	var calls atomic.Int32
 
-	g := gofuncy.NewGroup(t.Context(), "timeout-retry")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		n := calls.Add(1)
 		if n < 3 {
 			// First two attempts: wait for timeout
@@ -68,8 +68,8 @@ func TestTimeout_doesNotAffectSuccessfulCalls(t *testing.T) {
 
 	start := time.Now()
 
-	g := gofuncy.NewGroup(t.Context(), "timeout-fast")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return nil
 	}, gofuncy.WithTimeout(time.Second))
 
@@ -80,8 +80,8 @@ func TestTimeout_doesNotAffectSuccessfulCalls(t *testing.T) {
 func TestTimeout_propagatesNonTimeoutError(t *testing.T) {
 	t.Parallel()
 
-	g := gofuncy.NewGroup(t.Context(), "timeout-err")
-	g.Add("task", func(ctx context.Context) error {
+	g := gofuncy.NewGroup(t.Context())
+	g.Add(func(ctx context.Context) error {
 		return fmt.Errorf("application error")
 	}, gofuncy.WithTimeout(time.Second))
 

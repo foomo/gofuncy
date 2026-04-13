@@ -15,23 +15,23 @@ gofuncy uses functional options to configure behavior. There are three option ca
 
 | Type | Applies to | Example |
 |------|-----------|---------|
-| `baseOpt` | `Do`, `Wait`, `Go`, `NewGroup`, `Group.Add` | `WithRetry`, `WithTimeout`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithDetachedTrace`, `WithChildTrace` |
-| `goOnlyOpt` | `Do`, `Wait`, `Go`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
+| `baseOpt` | `Do`, `Wait`, `WaitWithStop`, `WaitWithReady`, `Go`, `Start`, `StartWithReady`, `StartWithStop`, `GoWithCancel`, `NewGroup`, `Group.Add` | `WithRetry`, `WithTimeout`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithDetachedTrace`, `WithChildTrace` |
+| `goOnlyOpt` | `Do`, `Wait`, `WaitWithStop`, `WaitWithReady`, `Go`, `Start`, `StartWithReady`, `StartWithStop`, `GoWithCancel`, `Group.Add` | `WithErrorHandler`, `WithCallerSkip` |
 | `groupOnlyOpt` | `NewGroup` | `WithLimit`, `WithFailFast` |
 
 Options are implemented as interfaces (`GoOption` and `GroupOption`), so the compiler prevents you from passing a group-only option to `Go()` or a go-only option to `NewGroup()`.
 
-The `name` parameter is required on all functions and is not an option:
+Use `WithName` to set a custom label for telemetry and context injection. When omitted, each function uses a low-cardinality default (e.g. `"gofuncy.go"`, `"gofuncy.group"`):
 
 ```go
-// Name is always the second argument (after context)
-gofuncy.Go(ctx, "worker", fn, gofuncy.WithTimeout(5*time.Second))
+// Default name: "gofuncy.go"
+gofuncy.Go(ctx, fn, gofuncy.WithTimeout(5*time.Second))
+
+// Custom name for better tracing
+gofuncy.Go(ctx, fn, gofuncy.WithName("worker"), gofuncy.WithTimeout(5*time.Second))
 
 // Group-only options work with NewGroup
-g := gofuncy.NewGroup(ctx, "pipeline", gofuncy.WithLimit(10), gofuncy.WithFailFast())
-
-// Per-function name override with Group.Add
-g.Add("specific-task", fn)
+g := gofuncy.NewGroup(ctx, gofuncy.WithLimit(10), gofuncy.WithFailFast())
 ```
 
 When you pass options to `Group.Add`, they are **merged** on top of the group's options. Booleans are OR'd, slices are appended, and non-zero values override.
@@ -103,7 +103,7 @@ Limits the number of concurrently executing functions within a single group. Use
 
 ```go
 // At most 5 functions run at the same time
-g := gofuncy.NewGroup(ctx, "workers", gofuncy.WithLimit(5))
+g := gofuncy.NewGroup(ctx, gofuncy.WithLimit(5))
 ```
 
 ### Cross-Callsite: WithLimiter
@@ -116,8 +116,8 @@ import "golang.org/x/sync/semaphore"
 // Global limiter: at most 20 concurrent goroutines across all call sites
 limiter := semaphore.NewWeighted(20)
 
-gofuncy.Go(ctx, "task-1", fn1, gofuncy.WithLimiter(limiter))
-gofuncy.Go(ctx, "task-2", fn2, gofuncy.WithLimiter(limiter))
+gofuncy.Go(ctx, fn1, gofuncy.WithLimiter(limiter))
+gofuncy.Go(ctx, fn2, gofuncy.WithLimiter(limiter))
 ```
 
 ::: warning
@@ -137,7 +137,7 @@ fn → timeout → retry → circuitBreaker → fallback
 Retries transient errors with configurable backoff:
 
 ```go
-gofuncy.Go(ctx, "fetch", fetchData,
+gofuncy.Go(ctx, fetchData,
     gofuncy.WithRetry(3),
     gofuncy.WithTimeout(5*time.Second), // per-attempt timeout
 )
@@ -157,7 +157,7 @@ var apiBreaker = gofuncy.NewCircuitBreaker(
     gofuncy.CircuitBreakerCooldown(30*time.Second),
 )
 
-gofuncy.Go(ctx, "api-call", callAPI,
+gofuncy.Go(ctx, callAPI,
     gofuncy.WithCircuitBreaker(apiBreaker),
 )
 ```
@@ -169,7 +169,7 @@ The circuit breaker is stateful — share a single instance across all calls to 
 Graceful degradation when a function fails:
 
 ```go
-g.Add("fetch", fetchFromAPI,
+g.Add(fetchFromAPI,
     gofuncy.WithRetry(3),
     gofuncy.WithFallback(func(ctx context.Context, err error) error {
         return loadFromCache(ctx)
@@ -184,7 +184,7 @@ See the [Options reference](/api/options) for fallback options.
 All resilience options compose naturally. The framework guarantees the correct ordering:
 
 ```go
-g.Add("api-call", callAPI,
+g.Add(callAPI,
     gofuncy.WithTimeout(2*time.Second),          // each attempt: 2s
     gofuncy.WithRetry(3),                         // up to 3 attempts
     gofuncy.WithCircuitBreaker(apiBreaker),       // fail fast on broken dep
@@ -214,7 +214,7 @@ logging := func(next gofuncy.Func) gofuncy.Func {
     }
 }
 
-gofuncy.Go(ctx, "logged-task", fn, gofuncy.WithMiddleware(logging))
+gofuncy.Go(ctx, fn, gofuncy.WithMiddleware(logging))
 ```
 
 The built-in resilience primitives (`Retry`, `Fallback`) are also available as middleware constructors for advanced use cases that require custom ordering via `WithMiddleware`.
@@ -243,7 +243,7 @@ OpenTelemetry tracing and metrics are enabled by default. Every `Go` and `Group.
 ### Disabling Telemetry
 
 ```go
-gofuncy.Go(ctx, "hot-path", fn,
+gofuncy.Go(ctx, fn,
     gofuncy.WithoutTracing(),
     gofuncy.WithoutStartedCounter(),
     gofuncy.WithoutErrorCounter(),
@@ -254,7 +254,7 @@ gofuncy.Go(ctx, "hot-path", fn,
 ### Custom Providers
 
 ```go
-gofuncy.Go(ctx, "custom-providers", fn,
+gofuncy.Go(ctx, fn,
     gofuncy.WithMeterProvider(customMeterProvider),
     gofuncy.WithTracerProvider(customTracerProvider),
 )

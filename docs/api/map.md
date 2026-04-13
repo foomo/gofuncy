@@ -15,7 +15,7 @@ Transforms items concurrently while preserving input order. Uses a `Group` inter
 ## Signature
 
 ```go
-func Map[T, R any](ctx context.Context, name string, items []T, fn func(ctx context.Context, item T) (R, error), opts ...GroupOption) ([]R, error)
+func Map[T, R any](ctx context.Context, items []T, fn func(ctx context.Context, item T) (R, error), opts ...GroupOption) ([]R, error)
 ```
 
 ### Type Parameters
@@ -30,7 +30,6 @@ func Map[T, R any](ctx context.Context, name string, items []T, fn func(ctx cont
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `ctx` | `context.Context` | Parent context. |
-| `name` | `string` | Name for the operation. Used in telemetry spans, metrics, and logs. |
 | `items` | `[]T` | Slice of items to transform. |
 | `fn` | `func(ctx context.Context, item T) (R, error)` | Transformation function. |
 | `opts` | `...GroupOption` | Options passed to the underlying `NewGroup` call. |
@@ -44,9 +43,58 @@ func Map[T, R any](ctx context.Context, name string, items []T, fn func(ctx cont
 
 If `items` is empty, returns `(nil, nil)` immediately.
 
-### Accepted Options
+## Options
 
-All `GroupOption` options apply: `WithLimit`, `WithFailFast`, `WithTimeout`, `WithMiddleware`, telemetry options, etc.
+### Naming
+
+| Option | Description |
+|--------|-------------|
+| `WithName(name)` | Custom metric/tracing label. Default: `"gofuncy.map"` |
+
+### Resilience
+
+| Option | Description |
+|--------|-------------|
+| `WithTimeout(d)` | Per-invocation timeout. Each retry attempt gets a fresh deadline. |
+| `WithRetry(n, opts...)` | Automatic retry with configurable backoff. |
+| `WithCircuitBreaker(cb)` | Fail fast on broken dependencies. Stateful — share across calls. |
+| `WithFallback(fn, opts...)` | Called when the operation fails. Return `nil` to suppress the error. |
+
+### Telemetry
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `WithoutTracing()` | on | Disable span creation. |
+| `WithDetachedTrace()` | varies | Root span linked to parent instead of child span. Default for `Go`/`Start`/`StartWithReady`/`StartWithStop`/`GoWithCancel`. |
+| `WithChildTrace()` | varies | Force child span. Default for `Do`/`Wait`/`NewGroup`. |
+| `WithoutStartedCounter()` | on | Disable started counter. |
+| `WithoutErrorCounter()` | on | Disable error counter. |
+| `WithoutActiveUpDownCounter()` | on | Disable active counter. |
+| `WithDurationHistogram()` | off | Enable duration histogram. |
+| `WithMeterProvider(mp)` | global | Custom OTel meter provider. |
+| `WithTracerProvider(tp)` | global | Custom OTel tracer provider. |
+
+### Concurrency
+
+| Option | Description |
+|--------|-------------|
+| `WithLimiter(sem)` | Shared `*semaphore.Weighted` for cross-callsite concurrency control. |
+
+### Middleware
+
+| Option | Description |
+|--------|-------------|
+| `WithMiddleware(m...)` | Append custom middleware. Applied after resilience, before telemetry. |
+| `WithLogger(l)` | Custom `*slog.Logger` for error reporting. |
+| `WithStallThreshold(d)` | Log a warning if the goroutine runs longer than `d`. |
+| `WithStallHandler(h)` | Custom callback for stall detection. |
+
+### Group-Only
+
+| Option | Description |
+|--------|-------------|
+| `WithLimit(n)` | Max concurrent functions in this group. |
+| `WithFailFast()` | Cancel remaining functions on first error. |
 
 ## Example
 
@@ -66,7 +114,7 @@ func main() {
 
 	ids := []int{1, 2, 3, 4, 5}
 
-	users, err := gofuncy.Map(ctx, "fetch-users", ids, func(ctx context.Context, id int) (string, error) {
+	users, err := gofuncy.Map(ctx, ids, func(ctx context.Context, id int) (string, error) {
 		// Simulate fetching a user by ID
 		return fmt.Sprintf("user-%d", id), nil
 	},

@@ -8,9 +8,7 @@ import (
 )
 
 func BenchmarkChannel_Send(b *testing.B) {
-	ch := channel.New[int]("bench",
-		channel.WithBuffer[int](1024),
-	)
+	ch := channel.New[int](channel.WithBuffer[int](1024))
 	defer ch.Close()
 
 	ctx := context.Background()
@@ -30,8 +28,7 @@ func BenchmarkChannel_Send(b *testing.B) {
 }
 
 func BenchmarkChannel_Send_NoTelemetry(b *testing.B) {
-	ch := channel.New[int]("bench",
-		channel.WithBuffer[int](1024),
+	ch := channel.New[int](channel.WithBuffer[int](1024),
 		channel.WithoutChansCounter[int](),
 		channel.WithoutMessagesSentCounter[int](),
 	)

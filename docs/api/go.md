@@ -3,8 +3,8 @@ prev:
   text: Core Concepts
   link: /guide/concepts
 next:
-  text: Wait
-  link: /api/wait
+  text: Start
+  link: /api/start
 ---
 
 # Go
@@ -14,7 +14,7 @@ Spawns a fire-and-forget goroutine with panic recovery, error handling, and tele
 ## Signature
 
 ```go
-func Go(ctx context.Context, name string, fn Func, opts ...GoOption)
+func Go(ctx context.Context, fn Func, opts ...GoOption)
 ```
 
 ### Parameters
@@ -22,17 +22,61 @@ func Go(ctx context.Context, name string, fn Func, opts ...GoOption)
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | `ctx` | `context.Context` | Parent context. Cancellation is propagated to the goroutine. |
-| `name` | `string` | Name for the routine. Used in telemetry spans, metrics, context injection, and logs. |
 | `fn` | `Func` | The function to execute. Signature: `func(ctx context.Context) error` |
 | `opts` | `...GoOption` | Functional options. Accepts any `baseOpt` or `goOnlyOpt`. |
 
-### Accepted Options
+## Options
 
-**Shared** (`baseOpt`): `WithTimeout`, `WithRetry`, `WithCircuitBreaker`, `WithFallback`, `WithMiddleware`, `WithLogger`, `WithStallThreshold`, `WithStallHandler`, `WithDurationHistogram`, `WithoutTracing`, `WithDetachedTrace`, `WithChildTrace`, `WithoutStartedCounter`, `WithoutErrorCounter`, `WithoutActiveUpDownCounter`, `WithMeterProvider`, `WithTracerProvider`, `WithLimiter`
+### Naming
 
-**Go-only** (`goOnlyOpt`): `WithErrorHandler`, `WithCallerSkip`
+| Option | Description |
+|--------|-------------|
+| `WithName(name)` | Custom metric/tracing label. Default: `"gofuncy.go"` |
 
-See the full [Options reference](/api/options).
+### Resilience
+
+| Option | Description |
+|--------|-------------|
+| `WithTimeout(d)` | Per-invocation timeout. Each retry attempt gets a fresh deadline. |
+| `WithRetry(n, opts...)` | Automatic retry with configurable backoff. |
+| `WithCircuitBreaker(cb)` | Fail fast on broken dependencies. Stateful — share across calls. |
+| `WithFallback(fn, opts...)` | Called when the operation fails. Return `nil` to suppress the error. |
+
+### Telemetry
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `WithoutTracing()` | on | Disable span creation. |
+| `WithDetachedTrace()` | varies | Root span linked to parent instead of child span. Default for `Go`/`Start`/`StartWithReady`/`StartWithStop`/`GoWithCancel`. |
+| `WithChildTrace()` | varies | Force child span. Default for `Do`/`Wait`/`NewGroup`. |
+| `WithoutStartedCounter()` | on | Disable started counter. |
+| `WithoutErrorCounter()` | on | Disable error counter. |
+| `WithoutActiveUpDownCounter()` | on | Disable active counter. |
+| `WithDurationHistogram()` | off | Enable duration histogram. |
+| `WithMeterProvider(mp)` | global | Custom OTel meter provider. |
+| `WithTracerProvider(tp)` | global | Custom OTel tracer provider. |
+
+### Concurrency
+
+| Option | Description |
+|--------|-------------|
+| `WithLimiter(sem)` | Shared `*semaphore.Weighted` for cross-callsite concurrency control. |
+
+### Middleware
+
+| Option | Description |
+|--------|-------------|
+| `WithMiddleware(m...)` | Append custom middleware. Applied after resilience, before telemetry. |
+| `WithLogger(l)` | Custom `*slog.Logger` for error reporting. |
+| `WithStallThreshold(d)` | Log a warning if the goroutine runs longer than `d`. |
+| `WithStallHandler(h)` | Custom callback for stall detection. |
+
+### Error Handling (Go-only)
+
+| Option | Description |
+|--------|-------------|
+| `WithErrorHandler(h)` | Custom error callback. Default: `slog.ErrorContext`. |
+| `WithCallerSkip(n)` | Adjust stack depth for span caller attributes. |
 
 ## Behavior
 
@@ -69,7 +113,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	gofuncy.Go(ctx, "background-task", func(ctx context.Context) error {
+	gofuncy.Go(ctx, func(ctx context.Context) error {
 		// Simulate work
 		time.Sleep(50 * time.Millisecond)
 		fmt.Println("task completed")
@@ -81,6 +125,51 @@ func main() {
 	// In production, use proper shutdown signaling instead of sleep
 	time.Sleep(100 * time.Millisecond)
 }
+```
+
+## GoWithCancel
+
+Spawns a goroutine and returns a stop function. Calling stop cancels the goroutine's context, signaling it to shut down. The stop function is safe to call multiple times.
+
+```go
+func GoWithCancel(ctx context.Context, fn Func, opts ...GoOption) StopFunc
+```
+
+### Parameters
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `ctx` | `context.Context` | Parent context. Cancellation is propagated to the goroutine. |
+| `fn` | `Func` | The function to execute. Signature: `func(ctx context.Context) error` |
+| `opts` | `...GoOption` | Functional options. |
+
+### Return Value
+
+Returns a `StopFunc`. Calling `stop()` cancels the goroutine's context, signaling it to shut down. Safe to call multiple times.
+
+### Behavior
+
+1. Same middleware chain as `Go`.
+2. A child context with cancel is created before spawning.
+3. The returned function cancels this context.
+4. Errors are handled via the `ErrorHandler`.
+
+### Example
+
+```go
+stop := gofuncy.GoWithCancel(ctx, func(ctx context.Context) error {
+    for {
+        select {
+        case <-ctx.Done():
+            return nil // clean shutdown
+        case <-time.After(time.Second):
+            process()
+        }
+    }
+})
+
+// Later, when you want to stop:
+stop()
 ```
 
 ## Types

@@ -3,7 +3,7 @@ module github.com/foomo/gofuncy
 go 1.26.0
 
 require (
-	github.com/foomo/go v0.8.1
+	github.com/foomo/go v0.9.0
 	github.com/foomo/opentelemetry-go v0.2.0
 	github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric v0.2.0
 	github.com/foomo/opentelemetry-go/exporters/glossy/glossytrace v0.2.0

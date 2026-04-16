@@ -948,6 +948,39 @@ func TestGroup_failFastCancelPropagation(t *testing.T) {
 	assert.ErrorIs(t, err, context.Canceled)
 }
 
+func TestGroup_failFastWithLimit(t *testing.T) {
+	t.Parallel()
+
+	triggerErr := fmt.Errorf("trigger")
+
+	g := gofuncy.NewGroup(t.Context(),
+		gofuncy.WithLimit(1),
+		gofuncy.WithFailFast(),
+		gofuncy.WithoutTracing(),
+		gofuncy.WithoutStartedCounter(),
+		gofuncy.WithoutErrorCounter(),
+		gofuncy.WithoutActiveUpDownCounter(),
+	)
+
+	// Goroutine A: runs immediately (limit=1), errors out → triggers cancel.
+	g.Add(func(ctx context.Context) error {
+		return triggerErr
+	})
+
+	// Goroutines B & C: blocked on semaphore, should see ctx.Done().
+	g.Add(func(ctx context.Context) error {
+		return fmt.Errorf("should not run")
+	})
+	g.Add(func(ctx context.Context) error {
+		return fmt.Errorf("should not run")
+	})
+
+	err := g.Wait()
+	require.Error(t, err)
+	assert.ErrorIs(t, err, triggerErr)
+	assert.ErrorIs(t, err, context.Canceled)
+}
+
 func TestGroup_errorOrderPreserved(t *testing.T) {
 	t.Parallel()
 

@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	slogx "github.com/foomo/go/slog"
+	goslog "github.com/foomo/go/slog"
 	"github.com/foomo/gofuncy"
 	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
 	"github.com/foomo/opentelemetry-go/exporters/glossy/glossytrace"
@@ -382,7 +382,7 @@ func TestGroup_withStallThreshold(t *testing.T) {
 func TestGroup_withDurationHistogram(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	g := gofuncy.NewGroup(t.Context(),
@@ -405,7 +405,7 @@ func TestGroup_withDurationHistogram(t *testing.T) {
 func TestGroup_withDurationHistogramErrors(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	g := gofuncy.NewGroup(t.Context(),
@@ -428,7 +428,7 @@ func TestGroup_withDurationHistogramErrors(t *testing.T) {
 func TestGroup_withAllMetrics(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	g := gofuncy.NewGroup(t.Context(),
@@ -451,7 +451,7 @@ func TestGroup_withAllMetrics(t *testing.T) {
 func TestGroup_withTracingAndMetrics(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
@@ -476,8 +476,8 @@ func TestGroup_withTracingAndMetrics(t *testing.T) {
 func TestGroup_addWithLogger(t *testing.T) {
 	t.Parallel()
 
-	groupLogger := slog.New(slogx.NewTestHandler(t))
-	addLogger := slog.New(slogx.NewTestHandler(t))
+	groupLogger := slog.New(goslog.NewTestHandler(t))
+	addLogger := slog.New(goslog.NewTestHandler(t))
 
 	g := gofuncy.NewGroup(t.Context(),
 		gofuncy.WithLogger(groupLogger),
@@ -501,7 +501,7 @@ func TestGroup_addWithLogger(t *testing.T) {
 func TestGroup_failFastWithTracing(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
 	started := make(chan struct{})
@@ -531,7 +531,7 @@ func TestGroup_failFastWithTracing(t *testing.T) {
 func TestGroup_failFastWithMetrics(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	started := make(chan struct{})
@@ -568,7 +568,7 @@ func TestGroup_withLimitAndMetrics(t *testing.T) {
 
 	const limit = 2
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	var (
@@ -631,7 +631,7 @@ func TestGroup_addWithTimeout(t *testing.T) {
 func TestGroup_addWithTracing(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	tp := oteltesting.ReportTraces(t, glossytrace.NewTest(t))
 
 	g := gofuncy.NewGroup(t.Context(),

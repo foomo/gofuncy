@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	slogx "github.com/foomo/go/slog"
+	goslog "github.com/foomo/go/slog"
 	"github.com/foomo/gofuncy"
 	"github.com/foomo/opentelemetry-go/exporters/glossy/glossymetric"
 	oteltesting "github.com/foomo/opentelemetry-go/testing"
@@ -59,7 +59,7 @@ func TestGo_basic(t *testing.T) {
 func TestGo_withDurationHistogram(t *testing.T) {
 	t.Parallel()
 
-	l := slog.New(slogx.NewTestHandler(t))
+	l := slog.New(goslog.NewTestHandler(t))
 	mp := oteltesting.ReportMetrics(t, glossymetric.NewTest(t))
 
 	done := make(chan struct{})

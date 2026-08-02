@@ -284,14 +284,17 @@ func findSpanEventually(t *testing.T, exp *tracetest.InMemoryExporter, tp *sdktr
 	t.Helper()
 
 	var found tracetest.SpanStub
+
 	require.Eventually(t, func() bool {
 		_ = tp.ForceFlush(t.Context())
+
 		for _, s := range exp.GetSpans() {
 			if s.Name == name {
 				found = s
 				return true
 			}
 		}
+
 		return false
 	}, time.Second, 5*time.Millisecond, "span %q not exported", name)
 

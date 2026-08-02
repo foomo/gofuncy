@@ -55,7 +55,11 @@ linters:
 
   # https://golangci-lint.run/docs/linters/
   settings:
-    # https://golangci-lint.run/docs/linters/configuration/#exhaustive
+    # https://golangci-lint.run/docs/linters/configuration/#importas
+    importas:
+      alias:
+        - pkg: github.com/foomo/go/([\w\d]+)
+          alias: go$1
     exhaustive:
       default-signifies-exhaustive: true
     # https://golangci-lint.run/docs/linters/configuration/#gosec

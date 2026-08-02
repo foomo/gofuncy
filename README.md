@@ -1,6 +1,6 @@
-[![Build Status](https://github.com/foomo/gofuncy/actions/workflows/test.yml/badge.svg?branch=main&event=push)](https://github.com/foomo/gofuncy/actions/workflows/test.yml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/foomo/gofuncy)](https://goreportcard.com/report/github.com/foomo/gofuncy)
-[![GoDoc](https://godoc.org/github.com/foomo/gofuncy?status.svg)](https://godoc.org/github.com/foomo/gofuncy)
+[![GoDoc](https://img.shields.io/badge/GoDoc-✓-informational.svg?style=flat-square&logo=go)](https://godoc.org/github.com/foomo/gofuncy)
+[![Coverage](https://img.shields.io/codecov/c/github/foomo/gofuncy?style=flat-square&logo=github)](https://app.codecov.io/gh/foomo/gofuncy)
+[![GitHub Stars](https://img.shields.io/github/stars/foomo/gofuncy.svg?style=flat-square&logo=github)](https://github.com/foomo/gofuncy)
 
 <p align="center">
   <img alt="gofuncy" src="docs/public/logo.png" width="400" height="400"/>
@@ -33,8 +33,8 @@ go get github.com/foomo/gofuncy
 ctx := gofuncy.Ctx(context.Background()).Root()
 
 // Fire-and-forget goroutine
-gofuncy.Go(ctx, func(ctx context.Context) error {
-    return doWork(ctx)
+gofuncy.Go(ctx, func (ctx context.Context) error {
+return doWork(ctx)
 })
 
 // Synchronous execution with middleware chain
@@ -51,23 +51,23 @@ err := wait()
 Every function wraps a `gofuncy.Func`:
 
 ```go
-type Func func(ctx context.Context) error
+type Func func (ctx context.Context) error
 ```
 
-| Function | Description |
-|----------|-------------|
-| `Go(ctx, fn, ...GoOption)` | Fire-and-forget goroutine with error logging |
-| `Start(ctx, fn, ...GoOption)` | Like Go, blocks until the goroutine is running |
-| `StartWithReady(ctx, fn, ...GoOption)` | Like Go, blocks until fn signals readiness |
-| `StartWithStop(ctx, fn, ...GoOption)` | Like Go, goroutine receives a stop function to cancel itself |
-| `GoWithCancel(ctx, fn, ...GoOption)` | Like Go, returns a stop function |
-| `Do(ctx, fn, ...GoOption)` | Synchronous execution, returns error directly |
-| `Wait(ctx, fn, ...GoOption)` | Goroutine that returns a wait function |
-| `WaitWithStop(ctx, fn, ...GoOption)` | Like Wait, goroutine receives a stop function |
-| `WaitWithReady(ctx, fn, ...GoOption)` | Like Wait, blocks until fn signals readiness |
-| `NewGroup(ctx, ...GroupOption)` | Concurrent group with shared lifecycle |
-| `All(ctx, items, fn, ...GroupOption)` | Execute fn for each item concurrently |
-| `Map(ctx, items, fn, ...GroupOption)` | Transform items concurrently, preserving order |
+| Function                               | Description                                                  |
+|----------------------------------------|--------------------------------------------------------------|
+| `Go(ctx, fn, ...GoOption)`             | Fire-and-forget goroutine with error logging                 |
+| `Start(ctx, fn, ...GoOption)`          | Like Go, blocks until the goroutine is running               |
+| `StartWithReady(ctx, fn, ...GoOption)` | Like Go, blocks until fn signals readiness                   |
+| `StartWithStop(ctx, fn, ...GoOption)`  | Like Go, goroutine receives a stop function to cancel itself |
+| `GoWithCancel(ctx, fn, ...GoOption)`   | Like Go, returns a stop function                             |
+| `Do(ctx, fn, ...GoOption)`             | Synchronous execution, returns error directly                |
+| `Wait(ctx, fn, ...GoOption)`           | Goroutine that returns a wait function                       |
+| `WaitWithStop(ctx, fn, ...GoOption)`   | Like Wait, goroutine receives a stop function                |
+| `WaitWithReady(ctx, fn, ...GoOption)`  | Like Wait, blocks until fn signals readiness                 |
+| `NewGroup(ctx, ...GroupOption)`        | Concurrent group with shared lifecycle                       |
+| `All(ctx, items, fn, ...GroupOption)`  | Execute fn for each item concurrently                        |
+| `Map(ctx, items, fn, ...GroupOption)`  | Transform items concurrently, preserving order               |
 
 ## Options
 
@@ -82,8 +82,8 @@ gofuncy.WithCircuitBreaker(cb)
 gofuncy.WithFallback(fallbackFn)
 
 // Concurrency
-gofuncy.WithLimit(10)      // Group only
-gofuncy.WithLimiter(sem)   // Shared semaphore
+gofuncy.WithLimit(10) // Group only
+gofuncy.WithLimiter(sem) // Shared semaphore
 
 // Telemetry (on by default, opt-out)
 gofuncy.WithoutTracing()
@@ -97,14 +97,14 @@ gofuncy.WithDurationHistogram() // opt-in
 
 Metrics (all via OpenTelemetry):
 
-| Name | Type | Default |
-|------|------|---------|
-| `gofuncy.goroutines.started` | Counter | on |
-| `gofuncy.goroutines.errors` | Counter | on |
-| `gofuncy.goroutines.active` | UpDownCounter | on |
-| `gofuncy.goroutines.stalled` | Counter | on |
-| `gofuncy.goroutines.duration.seconds` | Histogram | off |
-| `gofuncy.groups.duration.seconds` | Histogram | off |
+| Name                                  | Type          | Default |
+|---------------------------------------|---------------|---------|
+| `gofuncy.goroutines.started`          | Counter       | on      |
+| `gofuncy.goroutines.errors`           | Counter       | on      |
+| `gofuncy.goroutines.active`           | UpDownCounter | on      |
+| `gofuncy.goroutines.stalled`          | Counter       | on      |
+| `gofuncy.goroutines.duration.seconds` | Histogram     | off     |
+| `gofuncy.groups.duration.seconds`     | Histogram     | off     |
 
 ## Channel
 
@@ -119,17 +119,17 @@ defer ch.Close()
 ch.Send(ctx, "hello", "world")
 
 for msg := range ch.Receive() {
-    fmt.Println(msg)
+fmt.Println(msg)
 }
 ```
 
 Channel metrics:
 
-| Name | Type | Default |
-|------|------|---------|
-| `gofuncy.chans.current` | UpDownCounter | on |
-| `gofuncy.messages.sent` | Counter | on |
-| `gofuncy.messages.duration.seconds` | Histogram | off |
+| Name                                | Type           | Default |
+|-------------------------------------|----------------|---------|
+| `gofuncy.chans.current`             | UpDownCousnter | on      |
+| `gofuncy.messages.sent`             | Counter        | on      |
+| `gofuncy.messages.duration.seconds` | Histogram      | off     |
 
 ## How to Contribute
 

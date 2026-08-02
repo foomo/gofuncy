@@ -977,8 +977,8 @@ func TestGroup_failFastWithLimit(t *testing.T) {
 
 	err := g.Wait()
 	require.Error(t, err)
-	assert.ErrorIs(t, err, triggerErr)
-	assert.ErrorIs(t, err, context.Canceled)
+	require.ErrorIs(t, err, triggerErr)
+	require.ErrorIs(t, err, context.Canceled)
 }
 
 func TestGroup_errorOrderPreserved(t *testing.T) {

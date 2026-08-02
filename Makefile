@@ -32,7 +32,7 @@ endif
 
 .PHONY: check
 ## Run lint & test
-check: tidy generate lint test audit
+check: tidy generate lint.fix test.race test.bench audit
 
 .PHONY: tidy
 ## Run go mod tidy
@@ -62,33 +62,19 @@ lint.branch:
 ## Run tests
 test:
 	@echo "〉go test"
-	@GO_TEST_TAGS=-skip go test -coverprofile=coverage.out -tags=safe ./...
+	@GO_TEST_TAGS=-skip go test -v -tags=safe -shuffle=on -coverprofile=coverage.out ./...
 
 .PHONY: test.race
 ## Run tests with -race
 test.race:
 	@echo "〉go test -race"
-	@GO_TEST_TAGS=-skip go test -coverprofile=coverage.out -tags=safe -race ./...
-
-.PHONY: test.nocache
-## Run tests with -count=1
-test.nocache:
-	@echo "〉go test -count=1"
-	@GO_TEST_TAGS=-skip go test -coverprofile=coverage.out -tags=safe -count=1 ./...
+	@GO_TEST_TAGS=-skip go test -v -tags=safe -shuffle=on -coverprofile=coverage.out -race ./...
 
 .PHONY: test.bench
 ## Run tests with -bench
 test.bench:
 	@echo "〉go test -bench"
-	@GO_TEST_TAGS=-skip go test -tags=safe -bench=. -benchmem -count=10 ./... > .benchmark.txt | benchstat benchmark.txt .benchmark.txt
-	@rm .benchstat.txt
-
-.PHONY: test.bench.update
-## Run tests with -bench & update baseline.txt
-test.bench.update:
-	@echo "〉go test -bench (updating baseline)"
-	@GO_TEST_TAGS=-skip go test -tags=safe -bench=. -benchmem -count=10 ./... > benchmark.txt
-	@echo "✅ benchmark.txt updated"
+	@GO_TEST_TAGS=-skip go test -v -tags=safe -shuffle=on -bench=. -benchmem ./... > benchmarks.out
 
 .PHONY: generate
 ## Run go generate
@@ -102,24 +88,21 @@ generate:
 ## Run security audit
 audit:
 	@echo "〉security audit"
-	#@trivy fs . --format table --severity HIGH,CRITICAL
 	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@go govulncheck ./...
+	@govulncheck ./...
 
 .PHONY: outdated
 ## Show outdated direct dependencies
 outdated:
-	@echo "〉mise"
-	@mise outdated -l --local
 	@echo "〉go mod outdated"
-	@go list -u -m -json all | go-mod-outdated -update -direct
+	@go-mod-upgrade --list
 
 .PHONY: upgrade
 ## Show outdated direct dependencies
-upgrade: go.work
+upgrade:
 	@echo "〉go mod upgrade"
-	@go get -u ./...
-
+	@go-mod-upgrade
+	@$(MAKE) tidy
 
 ### Documentation
 
@@ -144,22 +127,34 @@ godocs:
 ### Utils
 
 .PHONY: help
+# https://patorjk.com/software/taag/#p=display&f=Tmplr&t=gotsrpc&x=none&v=4&h=4&w=80&we=false
 ## Show help text
+help: g=\033[0;32m
+help: b=\033[0;34m
+help: w=\033[0;90m
+help: e=\033[0m
 help:
+	@echo "$(g)"
 	@echo ""
-	@echo "goflux"
-	@echo ""
-	@echo "Usage:\n  make [task]"
+	@echo "    ┏"
+	@echo "┏┓┏┓╋┓┏┏┓┏┓┏"
+	@echo "┗┫┗┛┛┗┻┛┗┗┗┫"
+	@echo " ┛         ┛"
+	@echo "with ❤ foomo by bestbytes"
+	@echo "$(e)"
+	@echo "$(b)Usage:$(e)\n  make [task]"
 	@awk '{ \
 		if($$0 ~ /^### /){ \
-			if(help) printf "%-23s %s\n\n", cmd, help; help=""; \
-			printf "\n%s:\n", substr($$0,5); \
+			if(help) printf "  %-21s $(w)%s$(e)\n\n", cmd, help; help=""; \
+			printf "$(b)\n%s:$(e)\n", substr($$0,5); \
 		} else if($$0 ~ /^[a-zA-Z0-9._-]+:/){ \
 			cmd = substr($$0, 1, index($$0, ":")-1); \
-			if(help) printf "  %-23s %s\n", cmd, help; help=""; \
+			if(help) printf "  %-21s $(w)%s$(e)\n", cmd, help; help=""; \
 		} else if($$0 ~ /^##/){ \
 			help = help ? help "\n                        " substr($$0,3) : substr($$0,3); \
 		} else if(help){ \
-			print "\n                        " help "\n"; help=""; \
+			print "\n                        $(w)" help "$(e)\n"; help=""; \
 		} \
 	}' $(MAKEFILE_LIST)
+	@echo ""
+

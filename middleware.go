@@ -127,7 +127,7 @@ func withTracing(fn Func, o *options, spanName string, callerSkip int) Func {
 	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
 
 	return func(ctx context.Context) error {
-		attrs := append(traceAttrs, semconv.RoutineName(o.name))
+		attrs := traceAttrs
 
 		routineName := NameFromContext(ctx)
 		if routineName != NameNoName {
@@ -135,6 +135,7 @@ func withTracing(fn Func, o *options, spanName string, callerSkip int) Func {
 		}
 
 		startOpts := []trace.SpanStartOption{
+			trace.WithAttributes(semconv.RoutineName(o.name)),
 			trace.WithAttributes(attrs...),
 		}
 

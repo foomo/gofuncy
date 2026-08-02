@@ -59,7 +59,7 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 
 	if o.tracing {
 		startOpts := []trace.SpanStartOption{
-			trace.WithAttributes(semconv.RoutineName(o.name)),
+			trace.WithAttributes(semconv.GroupName(o.name)),
 		}
 
 		if o.detachedTrace {

@@ -2,13 +2,16 @@ package gofuncy_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/foomo/gofuncy"
+	"github.com/foomo/gofuncy/semconv"
 	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
@@ -158,7 +161,9 @@ func TestDo_childTraceByDefault(t *testing.T) {
 	doSpan := findSpan(t, spans, "gofuncy.do")
 
 	// Should be a child span
-	assert.Equal(t, "child-default", doSpan.Attributes[3].Value.String())
+	assert.True(t, slices.ContainsFunc(doSpan.Attributes, func(value attribute.KeyValue) bool {
+		return value.Key == semconv.RoutineNameKey && value.Value.String() == "child-default"
+	}))
 	assert.True(t, doSpan.Parent.IsValid(), "Do span should be a child span by default")
 	assert.Equal(t, parentSpan.SpanContext().TraceID(), doSpan.SpanContext.TraceID())
 	assert.Empty(t, doSpan.Links)

@@ -6,6 +6,8 @@ import "go.opentelemetry.io/otel/attribute"
 const (
 	// RoutineNameKey is the attribute key for the goroutine name.
 	RoutineNameKey = attribute.Key("gofuncy.routine.name")
+	// GroupNameKey is the attribute key for the group name.
+	GroupNameKey = attribute.Key("gofuncy.group.name")
 	// RoutineParentKey is the attribute key for the parent goroutine name.
 	RoutineParentKey = attribute.Key("gofuncy.routine.parent")
 	// ChanNameKey is the attribute key for the channel name.
@@ -23,6 +25,11 @@ const (
 // RoutineName returns an attribute with the goroutine name.
 func RoutineName(v string) attribute.KeyValue {
 	return RoutineNameKey.String(v)
+}
+
+// GroupName returns an attribute with the group name.
+func GroupName(v string) attribute.KeyValue {
+	return GroupNameKey.String(v)
 }
 
 // RoutineParent returns an attribute with the parent goroutine name.

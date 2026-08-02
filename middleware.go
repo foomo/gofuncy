@@ -12,7 +12,7 @@ import (
 	otelsemconv "go.opentelemetry.io/otel/semconv/v1.40.0"
 	"go.opentelemetry.io/otel/trace"
 
-	runtimex "github.com/foomo/go/runtime"
+	goruntime "github.com/foomo/go/runtime"
 	"github.com/foomo/gofuncy/semconv"
 	"github.com/foomo/gofuncy/semconv/gofuncyconv"
 )
@@ -116,11 +116,11 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 
 	traceAttrs := traceAttrsBuf[:0]
 
-	if _, full, file, line, ok := runtimex.Caller(callerSkip); ok {
+	if fr := goruntime.CallFrame(callerSkip); !fr.Zero() {
 		traceAttrs = append(traceAttrs,
-			otelsemconv.CodeFilePath(file),
-			otelsemconv.CodeLineNumber(line),
-			otelsemconv.CodeFunctionName(full),
+			otelsemconv.CodeFilePath(fr.File),
+			otelsemconv.CodeLineNumber(fr.Line),
+			otelsemconv.CodeFunctionName(fr.Name()),
 		)
 	}
 

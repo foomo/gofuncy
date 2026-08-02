@@ -204,12 +204,7 @@ func (c *Channel[T]) Send(ctx context.Context, values ...T) error {
 	var span trace.Span
 
 	if c.tracing {
-		spanName := "gofuncy.channel.send"
-		if c.name != "gofuncy.channel" {
-			spanName = "gofuncy.channel.send " + c.name
-		}
-
-		ctx, span = c.tracer.Start(ctx, spanName,
+		ctx, span = c.tracer.Start(ctx, "gofuncy.channel.send",
 			trace.WithSpanKind(trace.SpanKindProducer),
 			trace.WithAttributes(
 				semconv.ChanName(c.name),

@@ -7,11 +7,11 @@ import (
 // Do executes fn synchronously with the full middleware chain (resilience,
 // telemetry, tracing) and returns the error directly. Unlike Go, it does not
 // spawn a goroutine.
-// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.do".
+// Use WithName to set a custom metric/tracing label; defaults to "noname".
 func Do(ctx context.Context, fn Func, opts ...GoOption) error {
 	o := newGoOptions(opts)
 	if o.name == "" {
-		o.name = "gofuncy.do"
+		o.name = NameNoName
 	}
 
 	run := withContextInjection(fn, o.name)

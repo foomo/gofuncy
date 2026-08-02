@@ -111,7 +111,7 @@ func withDurationHistogram(fn Func, m metric.Meter, name string) Func {
 	}
 }
 
-func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
+func withTracing(fn Func, o *options, spanName string, callerSkip int) Func {
 	var traceAttrsBuf [4]attribute.KeyValue
 
 	traceAttrs := traceAttrsBuf[:0]
@@ -126,13 +126,8 @@ func withTracing(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 
 	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
 
-	spanName := spanPrefix
-	if o.name != spanPrefix {
-		spanName = spanPrefix + " " + o.name
-	}
-
 	return func(ctx context.Context) error {
-		attrs := traceAttrs
+		attrs := append(traceAttrs, semconv.RoutineName(o.name))
 
 		routineName := NameFromContext(ctx)
 		if routineName != NameNoName {
@@ -193,7 +188,7 @@ func withStallDetector(fn Func, threshold time.Duration, handler StallHandler, m
 	}
 }
 
-func buildChain(fn Func, o *options, spanPrefix string, callerSkip int) Func {
+func buildChain(fn Func, o *options, spanName string, callerSkip int) Func {
 	run := fn
 	run = withRecover(run)
 
@@ -244,7 +239,7 @@ func buildChain(fn Func, o *options, spanPrefix string, callerSkip int) Func {
 	}
 
 	if o.tracing {
-		run = withTracing(run, o, spanPrefix, callerSkip)
+		run = withTracing(run, o, spanName, callerSkip)
 	}
 
 	if o.stallThreshold > 0 {

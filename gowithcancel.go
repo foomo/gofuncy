@@ -19,7 +19,7 @@ func GoWithCancel(ctx context.Context, fn Func, opts ...GoOption) StopFunc {
 	}
 
 	run := withContextInjection(fn, o.name)
-	run = buildChain(run, &o, "gofuncy.gowithcancel", o.callerSkip+3)
+	run = buildChain(run, &o, "gofuncy.go", o.callerSkip+3)
 
 	ctx, cancel := context.WithCancel(ctx)
 

@@ -34,11 +34,11 @@ type Group struct {
 }
 
 // NewGroup creates a new Group with the given context and options.
-// Use WithName to set a custom metric/tracing label; defaults to "gofuncy.group".
+// Use WithName to set a custom metric/tracing label; defaults to "noname".
 func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 	o := newGroupOptions(opts)
 	if o.name == "" {
-		o.name = "gofuncy.group"
+		o.name = NameNoName
 	}
 
 	g := &Group{
@@ -58,7 +58,9 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 	}
 
 	if o.tracing {
-		startOpts := []trace.SpanStartOption{}
+		startOpts := []trace.SpanStartOption{
+			trace.WithAttributes(semconv.GroupName(o.name)),
+		}
 
 		if o.detachedTrace {
 			if parentSpan := trace.SpanFromContext(ctx); parentSpan.SpanContext().IsValid() {
@@ -69,12 +71,7 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 			}
 		}
 
-		spanName := "gofuncy.group"
-		if o.name != "gofuncy.group" {
-			spanName = "gofuncy.group " + o.name
-		}
-
-		g.ctx, g.span = o.tracer().Start(g.ctx, spanName, startOpts...) //nolint:spancheck
+		g.ctx, g.span = o.tracer().Start(g.ctx, "gofuncy.group", startOpts...) //nolint:spancheck
 		o.detachedTrace = false
 	}
 

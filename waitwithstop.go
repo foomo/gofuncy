@@ -22,7 +22,7 @@ func WaitWithStop(ctx context.Context, fn func(ctx context.Context, stop StopFun
 	})
 
 	run := withContextInjection(inner, o.name)
-	run = buildChain(run, &o, "gofuncy.waitwithstop", o.callerSkip+3)
+	run = buildChain(run, &o, "gofuncy.wait", o.callerSkip+3)
 
 	var (
 		result error

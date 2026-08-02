@@ -2,13 +2,16 @@ package gofuncy_test
 
 import (
 	"context"
+	"slices"
 	"testing"
 	"time"
 
 	"github.com/foomo/gofuncy"
+	"github.com/foomo/gofuncy/semconv"
 	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.opentelemetry.io/otel/attribute"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
@@ -45,7 +48,7 @@ func TestGo_detachedTraceByDefault(t *testing.T) {
 
 	parentSpan.End()
 
-	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go detached-default")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go")
 
 	// Should be a root span (no parent)
 	assert.False(t, goSpan.Parent.IsValid(), "Go span should be a root span (detached)")
@@ -89,7 +92,7 @@ func TestGo_withChildTrace(t *testing.T) {
 
 	parentSpan.End()
 
-	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go child-override")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go")
 
 	// Should be a child span (has parent)
 	assert.True(t, goSpan.Parent.IsValid(), "Go span should be a child span with WithChildTrace")
@@ -124,7 +127,7 @@ func TestGo_detachedTraceNoParent(t *testing.T) {
 		t.Fatal("timed out")
 	}
 
-	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go no-parent")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go")
 
 	// Root span with no links (no parent to link to)
 	assert.False(t, goSpan.Parent.IsValid())
@@ -155,9 +158,12 @@ func TestDo_childTraceByDefault(t *testing.T) {
 	tp.ForceFlush(t.Context())
 
 	spans := exp.GetSpans()
-	doSpan := findSpan(t, spans, "gofuncy.do child-default")
+	doSpan := findSpan(t, spans, "gofuncy.do")
 
 	// Should be a child span
+	assert.True(t, slices.ContainsFunc(doSpan.Attributes, func(value attribute.KeyValue) bool {
+		return value.Key == semconv.RoutineNameKey && value.Value.String() == "child-default"
+	}))
 	assert.True(t, doSpan.Parent.IsValid(), "Do span should be a child span by default")
 	assert.Equal(t, parentSpan.SpanContext().TraceID(), doSpan.SpanContext.TraceID())
 	assert.Empty(t, doSpan.Links)
@@ -184,7 +190,7 @@ func TestDo_withDetachedTrace(t *testing.T) {
 	tp.ForceFlush(t.Context())
 
 	spans := exp.GetSpans()
-	doSpan := findSpan(t, spans, "gofuncy.do detached-opt-in")
+	doSpan := findSpan(t, spans, "gofuncy.do")
 
 	// Should be a root span with link
 	assert.False(t, doSpan.Parent.IsValid(), "Do span should be detached with WithDetachedTrace")
@@ -222,7 +228,7 @@ func TestGroup_withDetachedTrace(t *testing.T) {
 	tp.ForceFlush(t.Context())
 
 	spans := exp.GetSpans()
-	groupSpan := findSpan(t, spans, "gofuncy.group detached-group")
+	groupSpan := findSpan(t, spans, "gofuncy.group")
 
 	// Group parent span should be a root with link to original parent
 	assert.False(t, groupSpan.Parent.IsValid(), "group span should be a root span")
@@ -230,8 +236,8 @@ func TestGroup_withDetachedTrace(t *testing.T) {
 	assert.Equal(t, parentSpan.SpanContext().SpanID(), groupSpan.Links[0].SpanContext.SpanID())
 
 	// Child Add spans should be children of the group root span (not detached)
-	taskA := findSpan(t, spans, "gofuncy.group.add task-a")
-	taskB := findSpan(t, spans, "gofuncy.group.add task-b")
+	taskA := findSpan(t, spans, "gofuncy.group.add")
+	taskB := findSpan(t, spans, "gofuncy.group.add")
 
 	assert.True(t, taskA.Parent.IsValid(), "task-a should be a child of the group span")
 	assert.Equal(t, groupSpan.SpanContext.SpanID(), taskA.Parent.SpanID())
@@ -265,7 +271,7 @@ func TestGroup_childTraceByDefault(t *testing.T) {
 	tp.ForceFlush(t.Context())
 
 	spans := exp.GetSpans()
-	groupSpan := findSpan(t, spans, "gofuncy.group child-group")
+	groupSpan := findSpan(t, spans, "gofuncy.group")
 
 	// Should be a child span by default
 	assert.True(t, groupSpan.Parent.IsValid(), "group span should be a child span by default")

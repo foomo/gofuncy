@@ -25,7 +25,7 @@ func StartWithStop(ctx context.Context, fn func(ctx context.Context, stop StopFu
 	})
 
 	run := withContextInjection(inner, o.name)
-	run = buildChain(run, &o, "gofuncy.startwithstop", o.callerSkip+3)
+	run = buildChain(run, &o, "gofuncy.start", o.callerSkip+3)
 
 	if o.limiter != nil {
 		if err := o.limiter.Acquire(ctx, 1); err != nil {

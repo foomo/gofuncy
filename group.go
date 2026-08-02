@@ -46,7 +46,7 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 	}
 
 	if o.failFast {
-		g.ctx, g.cancel = context.WithCancel(ctx) //nolint:gosec // cancel is called in Wait()
+		g.ctx, g.cancel = context.WithCancel(ctx)
 	}
 
 	if o.limit > 0 {

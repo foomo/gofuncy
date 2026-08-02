@@ -9,6 +9,7 @@ import (
 	oteltesting "github.com/foomo/opentelemetry-go/testing"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
 
@@ -43,10 +44,8 @@ func TestGo_detachedTraceByDefault(t *testing.T) {
 	}
 
 	parentSpan.End()
-	tp.ForceFlush(t.Context())
 
-	spans := exp.GetSpans()
-	goSpan := findSpan(t, spans, "gofuncy.go detached-default")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go detached-default")
 
 	// Should be a root span (no parent)
 	assert.False(t, goSpan.Parent.IsValid(), "Go span should be a root span (detached)")
@@ -89,10 +88,8 @@ func TestGo_withChildTrace(t *testing.T) {
 	}
 
 	parentSpan.End()
-	tp.ForceFlush(t.Context())
 
-	spans := exp.GetSpans()
-	goSpan := findSpan(t, spans, "gofuncy.go child-override")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go child-override")
 
 	// Should be a child span (has parent)
 	assert.True(t, goSpan.Parent.IsValid(), "Go span should be a child span with WithChildTrace")
@@ -127,10 +124,7 @@ func TestGo_detachedTraceNoParent(t *testing.T) {
 		t.Fatal("timed out")
 	}
 
-	tp.ForceFlush(t.Context())
-
-	spans := exp.GetSpans()
-	goSpan := findSpan(t, spans, "gofuncy.go no-parent")
+	goSpan := findSpanEventually(t, exp, tp, "gofuncy.go no-parent")
 
 	// Root span with no links (no parent to link to)
 	assert.False(t, goSpan.Parent.IsValid())
@@ -282,6 +276,27 @@ func TestGroup_childTraceByDefault(t *testing.T) {
 // ------------------------------------------------------------------------------------------------
 // ~ Helpers
 // ------------------------------------------------------------------------------------------------
+
+// findSpanEventually polls the batch processor (flushing each round) until the
+// named span is exported. Detached Go goroutines end their span after the user
+// func returns, so a single flush can race the span export.
+func findSpanEventually(t *testing.T, exp *tracetest.InMemoryExporter, tp *sdktrace.TracerProvider, name string) tracetest.SpanStub {
+	t.Helper()
+
+	var found tracetest.SpanStub
+	require.Eventually(t, func() bool {
+		_ = tp.ForceFlush(t.Context())
+		for _, s := range exp.GetSpans() {
+			if s.Name == name {
+				found = s
+				return true
+			}
+		}
+		return false
+	}, time.Second, 5*time.Millisecond, "span %q not exported", name)
+
+	return found
+}
 
 func findSpan(t *testing.T, spans tracetest.SpanStubs, name string) tracetest.SpanStub {
 	t.Helper()

@@ -18,6 +18,8 @@ func Wait(ctx context.Context, fn Func, opts ...GoOption) func() error {
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.wait", o.callerSkip+3)
 
+	recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 	var (
 		result error
 		done   = make(chan struct{})

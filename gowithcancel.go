@@ -21,6 +21,8 @@ func GoWithCancel(ctx context.Context, fn Func, opts ...GoOption) StopFunc {
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.go", o.callerSkip+3)
 
+	recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 	ctx, cancel := context.WithCancel(ctx)
 
 	if o.limiter != nil {

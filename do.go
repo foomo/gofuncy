@@ -17,6 +17,8 @@ func Do(ctx context.Context, fn Func, opts ...GoOption) error {
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.do", o.callerSkip+3)
 
+	recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 	if o.limiter != nil {
 		if err := o.limiter.Acquire(ctx, 1); err != nil {
 			return err

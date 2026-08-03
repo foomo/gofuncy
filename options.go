@@ -58,6 +58,7 @@ type options struct { //nolint:recvcheck
 	tracing             bool
 	detachedTrace       bool
 	childTrace          bool
+	spawnEvent          bool
 	startedCounter      bool
 	errorCounter        bool
 	activeUpDownCounter bool
@@ -136,6 +137,7 @@ func (o options) merge(override options) options {
 	o.tracing = o.tracing || override.tracing
 	o.detachedTrace = o.detachedTrace || override.detachedTrace
 	o.childTrace = o.childTrace || override.childTrace
+	o.spawnEvent = o.spawnEvent || override.spawnEvent
 	o.startedCounter = o.startedCounter || override.startedCounter
 	o.errorCounter = o.errorCounter || override.errorCounter
 	o.activeUpDownCounter = o.activeUpDownCounter || override.activeUpDownCounter
@@ -177,6 +179,7 @@ func (o options) merge(override options) options {
 func newGoOptions(opts []GoOption) options {
 	o := options{
 		tracing:             true,
+		spawnEvent:          true,
 		startedCounter:      true,
 		errorCounter:        true,
 		activeUpDownCounter: true,
@@ -194,6 +197,7 @@ func newGoOptions(opts []GoOption) options {
 func newGroupOptions(opts []GroupOption) options {
 	o := options{
 		tracing:             true,
+		spawnEvent:          true,
 		startedCounter:      true,
 		errorCounter:        true,
 		activeUpDownCounter: true,
@@ -273,6 +277,20 @@ func WithDetachedTrace() baseOpt {
 func WithChildTrace() baseOpt {
 	return func(o *options) {
 		o.childTrace = true
+	}
+}
+
+// WithoutSpawnEvent disables the caller-side "gofuncy.spawn" span event.
+//
+// When a routine is started detached (the default for Go, Start, and
+// GoWithCancel), gofuncy records an event on the caller's active span marking
+// that a background routine was launched. This keeps the launch visible from the
+// caller's trace even though the routine runs in its own linked root trace. The
+// event is only recorded when a valid parent span is present; use this option to
+// suppress it entirely.
+func WithoutSpawnEvent() baseOpt {
+	return func(o *options) {
+		o.spawnEvent = false
 	}
 }
 

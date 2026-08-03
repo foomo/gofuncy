@@ -71,6 +71,8 @@ func NewGroup(ctx context.Context, opts ...GroupOption) *Group {
 			}
 		}
 
+		recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 		g.ctx, g.span = o.tracer().Start(g.ctx, "gofuncy.group", startOpts...) //nolint:spancheck
 		o.detachedTrace = false
 	}

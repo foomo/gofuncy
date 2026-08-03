@@ -20,6 +20,8 @@ func Go(ctx context.Context, fn Func, opts ...GoOption) {
 	run := withContextInjection(fn, o.name)
 	run = buildChain(run, &o, "gofuncy.go", o.callerSkip+3)
 
+	recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 	if o.limiter != nil {
 		if err := o.limiter.Acquire(ctx, 1); err != nil {
 			handleError(ctx, err, o.errorHandler, o.l, o.name)

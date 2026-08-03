@@ -31,6 +31,8 @@ func WaitWithReady(ctx context.Context, fn func(ctx context.Context, ready Ready
 	run := withContextInjection(inner, o.name)
 	run = buildChain(run, &o, "gofuncy.wait", o.callerSkip+3)
 
+	recordSpawnEvent(ctx, &o, o.callerSkip+2)
+
 	var result error
 
 	if o.limiter != nil {

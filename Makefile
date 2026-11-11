@@ -32,7 +32,7 @@ endif
 
 .PHONY: check
 ## Run lint & test
-check: tidy generate lint.fix test.race test.bench audit
+check: tidy generate actionlint lint.fix test.race test.bench audit
 
 .PHONY: tidy
 ## Run go mod tidy
@@ -52,23 +52,17 @@ lint.fix:
 	@echo "〉golangci-lint run fix"
 	@golangci-lint run --fix
 
-.PHONY: lint.branch
-## Run linter with --new-from-rev=origin/main
-lint.branch:
-	@echo "〉golangci-lint run with --new-from-rev=origin/main"
-	@golangci-lint run --new-from-rev=origin/main
-
 .PHONY: test
 ## Run tests
 test:
 	@echo "〉go test"
-	@GO_TEST_TAGS=-skip go test -v -tags=safe -shuffle=on -coverprofile=coverage.out ./...
+	@GO_TEST_TAGS=-skip gotestsum -- -tags=safe -shuffle=on -coverprofile=coverage.out ./...
 
 .PHONY: test.race
 ## Run tests with -race
 test.race:
 	@echo "〉go test -race"
-	@GO_TEST_TAGS=-skip go test -v -tags=safe -shuffle=on -coverprofile=coverage.out -race ./...
+	@GO_TEST_TAGS=-skip gotestsum -- -tags=safe -shuffle=on -coverprofile=coverage.out -race ./...
 
 .PHONY: test.bench
 ## Run tests with -bench
@@ -84,24 +78,17 @@ generate:
 
 ### Dependencies
 
-.PHONY: audit
-## Run security audit
-audit:
-	@echo "〉security audit"
-	@go install golang.org/x/vuln/cmd/govulncheck@latest
-	@govulncheck ./...
-
 .PHONY: outdated
 ## Show outdated direct dependencies
 outdated:
 	@echo "〉go mod outdated"
-	@go-mod-upgrade --list
+	@go-mod-upgrade --cooldown 7d --list
 
 .PHONY: upgrade
-## Show outdated direct dependencies
+## Upgrade direct dependencies
 upgrade:
 	@echo "〉go mod upgrade"
-	@go-mod-upgrade
+	@go-mod-upgrade --cooldown 7d
 	@$(MAKE) tidy
 
 ### Documentation
@@ -124,10 +111,23 @@ godocs:
 	@echo "〉starting go docs"
 	@go doc -http
 
+### Security
+
+.PHONY: audit
+## Run security audit
+audit:
+	@echo "〉security audit"
+	@osv-scanner --call-analysis=all --config=.osv-scanner.toml $(if $(GITHUB_ACTIONS),--format=gh-annotations) -r .
+
 ### Utils
 
+.PHONY: actionlint
+## Run actionlint
+actionlint:
+	@actionlint
+
 .PHONY: help
-# https://patorjk.com/software/taag/#p=display&f=Tmplr&t=gotsrpc&x=none&v=4&h=4&w=80&we=false
+# https://patorjk.com/software/taag/#p=display&f=Future+Smooth&t=gofuncy&x=none&v=4&h=4&w=80&we=false
 ## Show help text
 help: g=\033[0;32m
 help: b=\033[0;34m
@@ -135,11 +135,9 @@ help: w=\033[0;90m
 help: e=\033[0m
 help:
 	@echo "$(g)"
-	@echo ""
-	@echo "    ┏"
-	@echo "┏┓┏┓╋┓┏┏┓┏┓┏"
-	@echo "┗┫┗┛┛┗┻┛┗┗┗┫"
-	@echo " ┛         ┛"
+	@echo "╭─╴╭─╮╭─╴╷ ╷╭╮╷╭─╴╷ ╷"
+	@echo "│╶╮│ │├╴ │ ││╰┤│  ╰┬╯"
+	@echo "╰─╯╰─╯╵  ╰─╯╵ ╵╰─╴ ╵"
 	@echo "with ❤ foomo by bestbytes"
 	@echo "$(e)"
 	@echo "$(b)Usage:$(e)\n  make [task]"
@@ -157,4 +155,3 @@ help:
 		} \
 	}' $(MAKEFILE_LIST)
 	@echo ""
-

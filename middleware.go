@@ -3,6 +3,7 @@ package gofuncy
 import (
 	"context"
 	"log/slog"
+	"slices"
 	"time"
 
 	"go.opentelemetry.io/otel"
@@ -124,7 +125,7 @@ func withTracing(fn Func, o *options, spanName string, callerSkip int) Func {
 		)
 	}
 
-	traceAttrs = traceAttrs[:len(traceAttrs):len(traceAttrs)]
+	traceAttrs = slices.Clip(traceAttrs)
 
 	return func(ctx context.Context) error {
 		attrs := traceAttrs

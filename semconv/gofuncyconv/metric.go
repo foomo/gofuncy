@@ -80,11 +80,20 @@ func NewGoroutinesStarted(m metric.Meter) (GoroutinesStarted, error) {
 	return GoroutinesStarted{inst: c}, err
 }
 
-func (GoroutinesStarted) Name() string                { return goroutinesStartedName }
-func (GoroutinesStarted) Unit() string                { return unitGoroutine }
-func (GoroutinesStarted) Description() string         { return goroutinesStartedDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesStarted metric.
+func (GoroutinesStarted) Name() string { return goroutinesStartedName }
+
+// Unit returns the unit of the GoroutinesStarted metric.
+func (GoroutinesStarted) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesStarted metric.
+func (GoroutinesStarted) Description() string { return goroutinesStartedDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesStarted) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the GoroutinesStarted metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesStarted) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -121,11 +130,20 @@ func NewGoroutinesErrors(m metric.Meter) (GoroutinesErrors, error) {
 	return GoroutinesErrors{inst: c}, err
 }
 
-func (GoroutinesErrors) Name() string                { return goroutinesErrorsName }
-func (GoroutinesErrors) Unit() string                { return unitGoroutine }
-func (GoroutinesErrors) Description() string         { return goroutinesErrorsDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesErrors metric.
+func (GoroutinesErrors) Name() string { return goroutinesErrorsName }
+
+// Unit returns the unit of the GoroutinesErrors metric.
+func (GoroutinesErrors) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesErrors metric.
+func (GoroutinesErrors) Description() string { return goroutinesErrorsDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesErrors) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the GoroutinesErrors metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesErrors) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -162,11 +180,20 @@ func NewGoroutinesRetries(m metric.Meter) (GoroutinesRetries, error) {
 	return GoroutinesRetries{inst: c}, err
 }
 
-func (GoroutinesRetries) Name() string                { return goroutinesRetriesName }
-func (GoroutinesRetries) Unit() string                { return unitGoroutine }
-func (GoroutinesRetries) Description() string         { return goroutinesRetriesDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesRetries metric.
+func (GoroutinesRetries) Name() string { return goroutinesRetriesName }
+
+// Unit returns the unit of the GoroutinesRetries metric.
+func (GoroutinesRetries) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesRetries metric.
+func (GoroutinesRetries) Description() string { return goroutinesRetriesDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesRetries) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the GoroutinesRetries metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesRetries) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -203,11 +230,20 @@ func NewGoroutinesRejected(m metric.Meter) (GoroutinesRejected, error) {
 	return GoroutinesRejected{inst: c}, err
 }
 
-func (GoroutinesRejected) Name() string                { return goroutinesRejectedName }
-func (GoroutinesRejected) Unit() string                { return unitGoroutine }
-func (GoroutinesRejected) Description() string         { return goroutinesRejectedDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesRejected metric.
+func (GoroutinesRejected) Name() string { return goroutinesRejectedName }
+
+// Unit returns the unit of the GoroutinesRejected metric.
+func (GoroutinesRejected) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesRejected metric.
+func (GoroutinesRejected) Description() string { return goroutinesRejectedDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesRejected) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the GoroutinesRejected metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesRejected) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -244,11 +280,20 @@ func NewGoroutinesStalled(m metric.Meter) (GoroutinesStalled, error) {
 	return GoroutinesStalled{inst: c}, err
 }
 
-func (GoroutinesStalled) Name() string                { return goroutinesStalledName }
-func (GoroutinesStalled) Unit() string                { return unitGoroutine }
-func (GoroutinesStalled) Description() string         { return goroutinesStalledDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesStalled metric.
+func (GoroutinesStalled) Name() string { return goroutinesStalledName }
+
+// Unit returns the unit of the GoroutinesStalled metric.
+func (GoroutinesStalled) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesStalled metric.
+func (GoroutinesStalled) Description() string { return goroutinesStalledDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesStalled) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the GoroutinesStalled metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesStalled) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -285,11 +330,20 @@ func NewGoroutinesActive(m metric.Meter) (GoroutinesActive, error) {
 	return GoroutinesActive{inst: c}, err
 }
 
-func (GoroutinesActive) Name() string                      { return goroutinesActiveName }
-func (GoroutinesActive) Unit() string                      { return unitGoroutine }
-func (GoroutinesActive) Description() string               { return goroutinesActiveDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesActive metric.
+func (GoroutinesActive) Name() string { return goroutinesActiveName }
+
+// Unit returns the unit of the GoroutinesActive metric.
+func (GoroutinesActive) Unit() string { return unitGoroutine }
+
+// Description returns the description of the GoroutinesActive metric.
+func (GoroutinesActive) Description() string { return goroutinesActiveDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesActive) Inst() metric.Int64UpDownCounter { return g.inst }
 
+// Add adds incr to the GoroutinesActive metric, attributed to the named routine. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesActive) Add(ctx context.Context, incr int64, routineName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -327,11 +381,20 @@ func NewGoroutinesDuration(m metric.Meter) (GoroutinesDuration, error) {
 	return GoroutinesDuration{inst: h}, err
 }
 
-func (GoroutinesDuration) Name() string                    { return goroutinesDurationName }
-func (GoroutinesDuration) Unit() string                    { return unitSeconds }
-func (GoroutinesDuration) Description() string             { return goroutinesDurationDesc }
+// Name returns the OpenTelemetry instrument name of the GoroutinesDuration metric.
+func (GoroutinesDuration) Name() string { return goroutinesDurationName }
+
+// Unit returns the unit of the GoroutinesDuration metric.
+func (GoroutinesDuration) Unit() string { return unitSeconds }
+
+// Description returns the description of the GoroutinesDuration metric.
+func (GoroutinesDuration) Description() string { return goroutinesDurationDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GoroutinesDuration) Inst() metric.Float64Histogram { return g.inst }
 
+// Record records value in seconds on the GoroutinesDuration metric, attributed to the named routine. The hasError flag marks whether the measured operation failed.
+// Extra attrs are appended to the attributes. It does nothing if the metric was created without a meter.
 func (g GoroutinesDuration) Record(ctx context.Context, value float64, routineName string, hasError bool, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -376,11 +439,20 @@ func NewGroupsDuration(m metric.Meter) (GroupsDuration, error) {
 	return GroupsDuration{inst: h}, err
 }
 
-func (GroupsDuration) Name() string                    { return groupsDurationName }
-func (GroupsDuration) Unit() string                    { return unitSeconds }
-func (GroupsDuration) Description() string             { return groupsDurationDesc }
+// Name returns the OpenTelemetry instrument name of the GroupsDuration metric.
+func (GroupsDuration) Name() string { return groupsDurationName }
+
+// Unit returns the unit of the GroupsDuration metric.
+func (GroupsDuration) Unit() string { return unitSeconds }
+
+// Description returns the description of the GroupsDuration metric.
+func (GroupsDuration) Description() string { return groupsDurationDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g GroupsDuration) Inst() metric.Float64Histogram { return g.inst }
 
+// Record records value in seconds on the GroupsDuration metric, attributed to the named routine. The hasError flag marks whether the measured operation failed.
+// Extra attrs are appended to the attributes. It does nothing if the metric was created without a meter.
 func (g GroupsDuration) Record(ctx context.Context, value float64, routineName string, hasError bool, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -424,11 +496,20 @@ func NewChansCurrent(m metric.Meter) (ChansCurrent, error) {
 	return ChansCurrent{inst: c}, err
 }
 
-func (ChansCurrent) Name() string                      { return chansCurrentName }
-func (ChansCurrent) Unit() string                      { return unitChan }
-func (ChansCurrent) Description() string               { return chansCurrentDesc }
+// Name returns the OpenTelemetry instrument name of the ChansCurrent metric.
+func (ChansCurrent) Name() string { return chansCurrentName }
+
+// Unit returns the unit of the ChansCurrent metric.
+func (ChansCurrent) Unit() string { return unitChan }
+
+// Description returns the description of the ChansCurrent metric.
+func (ChansCurrent) Description() string { return chansCurrentDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g ChansCurrent) Inst() metric.Int64UpDownCounter { return g.inst }
 
+// Add adds incr to the ChansCurrent metric, attributed to the named channel. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g ChansCurrent) Add(ctx context.Context, incr int64, chanName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -465,11 +546,20 @@ func NewMessagesSent(m metric.Meter) (MessagesSent, error) {
 	return MessagesSent{inst: c}, err
 }
 
-func (MessagesSent) Name() string                { return messagesSentName }
-func (MessagesSent) Unit() string                { return unitMessage }
-func (MessagesSent) Description() string         { return messagesSentDesc }
+// Name returns the OpenTelemetry instrument name of the MessagesSent metric.
+func (MessagesSent) Name() string { return messagesSentName }
+
+// Unit returns the unit of the MessagesSent metric.
+func (MessagesSent) Unit() string { return unitMessage }
+
+// Description returns the description of the MessagesSent metric.
+func (MessagesSent) Description() string { return messagesSentDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g MessagesSent) Inst() metric.Int64Counter { return g.inst }
 
+// Add adds incr to the MessagesSent metric, attributed to the named channel. Extra attrs are appended to the
+// attributes. It does nothing if the metric was created without a meter.
 func (g MessagesSent) Add(ctx context.Context, incr int64, chanName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return
@@ -507,11 +597,20 @@ func NewMessagesDuration(m metric.Meter) (MessagesDuration, error) {
 	return MessagesDuration{inst: h}, err
 }
 
-func (MessagesDuration) Name() string                    { return messagesDurationName }
-func (MessagesDuration) Unit() string                    { return unitSeconds }
-func (MessagesDuration) Description() string             { return messagesDurationDesc }
+// Name returns the OpenTelemetry instrument name of the MessagesDuration metric.
+func (MessagesDuration) Name() string { return messagesDurationName }
+
+// Unit returns the unit of the MessagesDuration metric.
+func (MessagesDuration) Unit() string { return unitSeconds }
+
+// Description returns the description of the MessagesDuration metric.
+func (MessagesDuration) Description() string { return messagesDurationDesc }
+
+// Inst returns the underlying OpenTelemetry instrument. It is nil if the metric was created without a meter.
 func (g MessagesDuration) Inst() metric.Float64Histogram { return g.inst }
 
+// Record records value in seconds on the MessagesDuration metric, attributed to the named channel.
+// Extra attrs are appended to the attributes. It does nothing if the metric was created without a meter.
 func (g MessagesDuration) Record(ctx context.Context, value float64, chanName string, attrs ...attribute.KeyValue) {
 	if g.inst == nil {
 		return

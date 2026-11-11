@@ -282,6 +282,8 @@ func (c *Channel[T]) Name() string {
 // ~ Private methods
 // ------------------------------------------------------------------------------------------------
 
+// sendOne sends value unless ctx is done or the channel is closing.
+// It returns ctx.Err() or [ErrClosed] in those cases.
 func (c *Channel[T]) sendOne(ctx context.Context, value T) error {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
@@ -296,6 +298,7 @@ func (c *Channel[T]) sendOne(ctx context.Context, value T) error {
 	}
 }
 
+// meter returns the meter from the configured provider, or from the global provider if none is set.
 func (c *Channel[T]) meter() metric.Meter {
 	mp := c.meterProvider
 	if mp == nil {
@@ -305,6 +308,7 @@ func (c *Channel[T]) meter() metric.Meter {
 	return mp.Meter(gofuncy.ScopeName, metric.WithSchemaURL(otelsemconv.SchemaURL))
 }
 
+// tracerFn returns the tracer from the configured provider, or from the global provider if none is set.
 func (c *Channel[T]) tracerFn() trace.Tracer {
 	tp := c.tracerProvider
 	if tp == nil {

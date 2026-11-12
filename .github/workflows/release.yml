@@ -26,6 +26,8 @@ jobs:
 
       # https://github.com/jdx/mise-action/releases
       - uses: jdx/mise-action@7e36c90d9ab29c415a2384db3006f3ec8a8cc654 # v4.2.4
+        with:
+          install_args: go goreleaser
 
       - name: Setup go cache
         # https://github.com/actions/cache/releases
@@ -34,7 +36,7 @@ jobs:
           path: |
             ~/go/pkg/mod
             ~/.cache/go-build
-          key: go-${{ runner.os }}-${{ hashFiles('**/go.mod') }}
+          key: go-${{ runner.os }}-${{ hashFiles('.mise.toml', '**/go.sum') }}
           restore-keys: |
             go-${{ runner.os }}-
 

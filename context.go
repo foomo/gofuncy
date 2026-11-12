@@ -4,6 +4,7 @@ import (
 	"context"
 )
 
+// contextKey is the type of context keys owned by this package.
 type contextKey int
 
 // Context wraps a standard context with helper methods for accessing

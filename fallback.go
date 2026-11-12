@@ -8,6 +8,7 @@ import (
 // FallbackOption configures fallback behavior.
 type FallbackOption func(*fallbackConfig)
 
+// fallbackConfig holds the settings applied by [FallbackOption] values.
 type fallbackConfig struct {
 	fallbackIf func(error) bool
 }

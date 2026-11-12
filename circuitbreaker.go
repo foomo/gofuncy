@@ -20,6 +20,7 @@ var ErrCircuitOpen = errors.New("circuit breaker is open")
 // CircuitBreakerOption configures circuit breaker behavior.
 type CircuitBreakerOption func(*circuitBreakerConfig)
 
+// circuitBreakerConfig holds the settings applied by [CircuitBreakerOption] values.
 type circuitBreakerConfig struct {
 	threshold     int
 	cooldown      time.Duration

@@ -13,7 +13,11 @@ next:
 
 Limit concurrent execution and stop early on the first error.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/failfast.svg" alt="In a fail-fast group, f1 returns nil, f2 returns err, and f3 and f4 get context.Canceled."></div>
+
+```go [Code]
 package main
 
 import (
@@ -54,11 +58,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Shared Limiter Across Call Sites
 
 Use a `*semaphore.Weighted` to limit concurrency across multiple independent `Go` calls.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/limiter.svg" alt="Two call sites share one limiter of size 2. a1 and b1 run first. a2 and b2 start only when a slot is free."></div>
+
+```go [Code]
 package main
 
 import (
@@ -91,11 +101,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Stall Detection
 
 Detect goroutines that take longer than expected without cancelling them.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/stall.svg" alt="The stall detector lets fast end. For slow it logs a stall warning, and slow still ends later."></div>
+
+```go [Code]
 package main
 
 import (
@@ -126,11 +142,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Custom Middleware
 
 Add cross-cutting behavior like logging or retries using middleware.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/middleware.svg" alt="User middleware sits between the resilience layers and metrics. A retried err reaches logging as ok. A panic reaches logging as PanicError."></div>
+
+```go [Code]
 package main
 
 import (
@@ -186,11 +208,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Map with Timeout
 
 Transform items concurrently with a per-group timeout.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/map-timeout.svg" alt="Map with WithTimeout(250ms) and WithLimit(3): ids 1 and 2 give result-1 and result-2. ids 3, 4 and 5 time out."></div>
+
+```go [Code]
 package main
 
 import (
@@ -227,6 +255,8 @@ func main() {
 	}
 }
 ```
+
+:::
 
 ## Disabling Telemetry
 

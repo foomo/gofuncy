@@ -28,7 +28,7 @@ func BenchmarkGoRaw(b *testing.B) {
 			close(errChan)
 		}()
 
-		<-errChan
+		<-errChan //nolint:errcheck
 	}
 }
 

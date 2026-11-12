@@ -19,6 +19,7 @@ type Backoff func(attempt int) time.Duration
 // RetryOption configures retry behavior.
 type RetryOption func(*retryConfig)
 
+// retryConfig holds the settings applied by [RetryOption] values.
 type retryConfig struct {
 	backoff func(attempt int) time.Duration
 	retryIf func(error) bool

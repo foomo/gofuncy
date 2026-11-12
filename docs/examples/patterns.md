@@ -12,7 +12,11 @@ Common concurrency patterns solved with gofuncy.
 
 Distribute work across multiple goroutines and collect all results.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/fanout.svg" alt="Map with WithLimit(3) fetches orders 101 to 104 with at most 3 at the same time and returns them in input order."></div>
+
+```go [Code]
 package main
 
 import (
@@ -51,11 +55,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Pipeline
 
 Chain multiple transformation stages, each running concurrently.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/pipeline.svg" alt="Two Map stages: trim turns padded strings into hello, WORLD and GoFuncy. lower turns them into hello, world and gofuncy."></div>
+
+```go [Code]
 package main
 
 import (
@@ -93,11 +103,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Timeout with Fallback
 
 Attempt a primary operation with a timeout, then fall back to a cached value.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/chain.svg" alt="The resilience chain: err fails again in retry and becomes cache in fallback. A slow call becomes DeadlineExceeded in timeout and passes retry and fallback unchanged."></div>
+
+```go [Code]
 package main
 
 import (
@@ -144,11 +160,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Graceful Shutdown
 
 Use context cancellation to signal all goroutines to stop.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/shutdown.svg" alt="A group runs workers w0, w1 and w2. SIGTERM cancels the context, all workers return nil and Wait returns nil."></div>
+
+```go [Code]
 package main
 
 import (
@@ -190,11 +212,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Batch Processing
 
 Process a large dataset in batches with controlled concurrency.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/batch.svg" alt="All processes items 0 to 4 with at most 2 at the same time and returns nil."></div>
+
+```go [Code]
 package main
 
 import (
@@ -231,11 +259,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Parallel Aggregation
 
 Run multiple data sources in parallel and aggregate results.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/aggregate.svg" alt="A group fetches users, orders and billing at the same time. Wait returns nil when all three end."></div>
+
+```go [Code]
 package main
 
 import (
@@ -283,3 +317,5 @@ func main() {
 	// Output: Users: 1500, Orders: 3200, Revenue: $450000
 }
 ```
+
+:::

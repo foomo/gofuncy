@@ -11,6 +11,8 @@ next:
 
 Spawns a fire-and-forget goroutine with panic recovery, error handling, and telemetry.
 
+![Go runs three calls. The ok call ends without output. The err call and the panic call send err and PanicError to the ErrorHandler.](../guide/diagrams/go.svg)
+
 ## Signature
 
 ```go
@@ -130,6 +132,8 @@ func main() {
 ## GoWithCancel
 
 Spawns a goroutine and returns a stop function. Calling stop cancels the goroutine's context, signaling it to shut down. The stop function is safe to call multiple times.
+
+![GoWithCancel processes ticks t1 and t2. Then stop() cancels the context, fn returns nil, and t3 and t4 stay unprocessed.](../guide/diagrams/gowithcancel.svg)
 
 ```go
 func GoWithCancel(ctx context.Context, fn Func, opts ...GoOption) StopFunc

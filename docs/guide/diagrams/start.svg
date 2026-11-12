@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 467 188" width="467" height="188" role="img" aria-label="Start begins serve in a goroutine. The caller resumes only after serve runs.">
+<style>
+text{font:600 15px ui-monospace,SFMono-Regular,Menlo,monospace;text-anchor:middle;dominant-baseline:central;fill:#303446}
+.lbl{font:500 13px ui-sans-serif,system-ui,sans-serif;fill:#838ba7;text-anchor:start}
+.note{font:500 15px ui-sans-serif,system-ui,sans-serif;fill:#838ba7;text-anchor:start}
+.op{fill:#c6d0f5}
+.in{fill:#8caaee}.mid{fill:#ca9ee6}.out{fill:#a6d189}.err{fill:#e78284}
+.box{fill:#414559;stroke:#838ba7;stroke-width:1.5}
+.wire{stroke:#838ba7;stroke-width:1.5;stroke-dasharray:4 4;fill:none}
+@keyframes t0{0.000%{transform:translate(0.0px,0.0px);opacity:1}7.933%{transform:translate(0.0px,0.0px);opacity:1}17.850%{transform:translate(130.0px,0.0px);opacity:1}18.247%{transform:translate(130.0px,0.0px);opacity:0}88.100%{transform:translate(130.0px,0.0px);opacity:0}88.496%{transform:translate(0.0px,0.0px);opacity:0}100.000%{transform:translate(0.0px,0.0px);opacity:1}}.t0{animation:t0 5.04s linear infinite}@keyframes t1{0.000%{transform:translate(-188.4px,0.0px);opacity:0}17.850%{transform:translate(-188.4px,0.0px);opacity:0}18.247%{transform:translate(-188.4px,0.0px);opacity:1}32.222%{transform:translate(0.0px,0.0px);opacity:1}80.166%{transform:translate(0.0px,0.0px);opacity:1}88.100%{transform:translate(0.0px,0.0px);opacity:0}100.000%{transform:translate(0.0px,0.0px);opacity:0}}.t1{animation:t1 5.04s linear infinite}@keyframes t2{0.000%{transform:translate(-192.9px,0.0px);opacity:0}33.717%{transform:translate(-192.9px,0.0px);opacity:0}34.114%{transform:translate(-192.9px,0.0px);opacity:1}48.432%{transform:translate(0.0px,0.0px);opacity:1}80.166%{transform:translate(0.0px,0.0px);opacity:1}88.100%{transform:translate(0.0px,0.0px);opacity:0}100.000%{transform:translate(0.0px,0.0px);opacity:0}}.t2{animation:t2 5.04s linear infinite}
+@media (prefers-reduced-motion:reduce){g{animation:none!important}.k{opacity:1}.h{opacity:0}}
+</style>
+<path class="wire" d="M119.4 81.0H155.4"/><path class="wire" d="M266.4 48.0H296.4"/><path class="wire" d="M266.4 114.0H296.4"/><text class="lbl" x="20.0" y="81.0">fn</text><text class="lbl" x="302.4" y="48.0">running</text><text class="lbl" x="302.4" y="114.0">caller</text><g class="t0 k"><rect class="in" x="48.4" y="63.0" width="65.0" height="36" rx="18.0"/><text x="80.9" y="81.0">serve</text></g><g class="t1 k"><rect class="out" x="366.8" y="30.0" width="65.0" height="36" rx="18.0"/><text x="399.3" y="48.0">serve</text></g><g class="t2 k"><rect class="out" x="366.8" y="96.0" width="74.0" height="36" rx="18.0"/><text x="403.8" y="114.0">resume</text></g><rect class="box" x="155.4" y="20.0" width="111.0" height="122.0" rx="10"/><text class="op" x="210.9" y="81.0">Start(fn)</text><text class="note" x="20" y="172.0">Start returns only when the goroutine runs.</text>
+</svg>

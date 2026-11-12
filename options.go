@@ -29,23 +29,29 @@ type GroupOption interface {
 // baseOpt implements both GoOption and GroupOption.
 type baseOpt func(*options)
 
-func (f baseOpt) applyGo(o *options)    { f(o) }
+// applyGo applies f to o.
+func (f baseOpt) applyGo(o *options) { f(o) }
+
+// applyGroup applies f to o.
 func (f baseOpt) applyGroup(o *options) { f(o) }
 
 // goOnlyOpt implements only GoOption.
 type goOnlyOpt func(*options)
 
+// applyGo applies f to o.
 func (f goOnlyOpt) applyGo(o *options) { f(o) }
 
 // groupOnlyOpt implements only GroupOption.
 type groupOnlyOpt func(*options)
 
+// applyGroup applies f to o.
 func (f groupOnlyOpt) applyGroup(o *options) { f(o) }
 
 // ------------------------------------------------------------------------------------------------
 // ~ Options struct
 // ------------------------------------------------------------------------------------------------
 
+// options holds the resolved settings of a [Go], [Do], [Wait] call or a [Group].
 type options struct { //nolint:recvcheck
 	l              *slog.Logger
 	name           string

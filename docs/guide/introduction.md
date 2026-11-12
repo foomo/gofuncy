@@ -13,6 +13,8 @@ next:
 
 Go makes concurrency easy to start but hard to get right. A bare `go func()` call has several pitfalls:
 
+![A bare go func() runs three calls. The ok call ends, the err call loses its error, and the panic call crashes the process.](./diagrams/gofunc.svg)
+
 - **Unrecovered panics** -- a panic in a goroutine crashes the entire process with no chance to log or handle it gracefully.
 - **Lost errors** -- errors returned inside goroutines are silently discarded unless you wire up channels or error groups yourself.
 - **No observability** -- you get no metrics, traces, or structured logs about goroutine lifecycle unless you instrument every call site manually.
@@ -22,6 +24,8 @@ Go makes concurrency easy to start but hard to get right. A bare `go func()` cal
 ## Why gofuncy?
 
 Every production goroutine eventually needs panic recovery, error handling, and some form of observability. You can bolt these on one by one at each call site, or you can get them all from a single function call.
+
+![Go runs three calls. The ok call ends without output. The err call and the panic call send err and PanicError to the ErrorHandler.](./diagrams/go.svg)
 
 **Safety by default.** A bare `go func()` that panics takes down your entire process. gofuncy recovers every panic automatically, wraps it in a `*PanicError` with the full stack trace, and routes it through your error handling pipeline.
 

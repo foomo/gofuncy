@@ -98,7 +98,11 @@ If `items` is empty, returns `(nil, nil)` immediately.
 
 ## Example
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/map.svg" alt="Map turns ids 1, 2 and 3 into user-1, user-2 and user-3 in the same order."></div>
+
+```go [Code]
 package main
 
 import (
@@ -112,22 +116,22 @@ import (
 func main() {
 	ctx := context.Background()
 
-	ids := []int{1, 2, 3, 4, 5}
+	ids := []int{1, 2, 3}
 
 	users, err := gofuncy.Map(ctx, ids, func(ctx context.Context, id int) (string, error) {
 		// Simulate fetching a user by ID
 		return fmt.Sprintf("user-%d", id), nil
-	},
-		gofuncy.WithLimit(3),
-	)
+	})
 	if err != nil {
 		fmt.Println("errors:", err)
 	}
 
 	fmt.Println(strings.Join(users, ", "))
-	// Output: user-1, user-2, user-3, user-4, user-5
+	// Output: user-1, user-2, user-3
 }
 ```
+
+:::
 
 ::: warning
 Results are stored by index. If some transformations fail and you did not use `WithFailFast`, the result slice will contain zero values at the indices of failed items. Always check the returned error.

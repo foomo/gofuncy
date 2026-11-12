@@ -15,6 +15,8 @@ Spawn goroutines with startup guarantees. `Start` blocks until the goroutine is 
 
 Blocks until the goroutine has actually started executing. Useful in tests where you need the routine to be running before proceeding.
 
+![Start begins serve in a goroutine. The caller resumes only after serve runs.](../guide/diagrams/start.svg)
+
 ```go
 func Start(ctx context.Context, fn Func, opts ...GoOption)
 ```
@@ -48,6 +50,8 @@ gofuncy.Start(ctx, func(ctx context.Context) error {
 ## StartWithReady
 
 Blocks until the goroutine signals readiness by calling `ready()`. If the function returns before calling `ready()`, `StartWithReady` unblocks anyway.
+
+![StartWithReady runs fn. fn calls ready() after listen, and only then the caller resumes.](../guide/diagrams/startwithready.svg)
 
 ```go
 func StartWithReady(ctx context.Context, fn func(ctx context.Context, ready ReadyFunc) error, opts ...GoOption)
@@ -85,6 +89,8 @@ gofuncy.StartWithReady(ctx, func(ctx context.Context, ready ReadyFunc) error {
 ## StartWithStop
 
 Spawns a fire-and-forget goroutine that receives a stop function. Calling stop cancels the goroutine's context from within, signaling it to shut down. The stop function is safe to call multiple times.
+
+![StartWithStop reads m1 and m2. On quit, fn calls stop(), the context ends, fn returns nil and m4 stays unread.](../guide/diagrams/startwithstop.svg)
 
 ```go
 func StartWithStop(ctx context.Context, fn func(ctx context.Context, stop StopFunc) error, opts ...GoOption)

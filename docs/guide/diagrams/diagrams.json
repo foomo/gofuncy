@@ -1,0 +1,1921 @@
+{
+  "go": {
+    "op": "Go(fn)",
+    "in": [
+      [
+        "calls",
+        [
+          "ok",
+          "err",
+          "panic"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "ErrorHandler"
+    ],
+    "red": [
+      "ErrorHandler"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "take": [
+          2
+        ],
+        "emit": [
+          [
+            1,
+            "PanicError"
+          ]
+        ]
+      }
+    ],
+    "note": "Go returns at once. Errors and panics go to the ErrorHandler.",
+    "alt": "Go runs three calls. The ok call ends without output. The err call and the panic call send err and PanicError to the ErrorHandler."
+  },
+  "gowithcancel": {
+    "op": "GoWithCancel",
+    "in": [
+      [
+        "ticks",
+        [
+          "t1",
+          "t2",
+          "t3",
+          "t4"
+        ]
+      ],
+      [
+        "stop()",
+        [
+          "stop"
+        ]
+      ]
+    ],
+    "out": [
+      "return"
+    ],
+    "steps": [
+      {
+        "take": [
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      {
+        "take": [
+          [
+            0,
+            1
+          ]
+        ]
+      },
+      {
+        "take": [
+          [
+            1,
+            0
+          ]
+        ],
+        "emit": [
+          "nil"
+        ],
+        "wait": 0.3
+      }
+    ],
+    "note": "stop() cancels ctx. fn returns nil. t3 and t4 are not processed.",
+    "alt": "GoWithCancel processes ticks t1 and t2. Then stop() cancels the context, fn returns nil, and t3 and t4 stay unprocessed."
+  },
+  "startwithready": {
+    "op": "StartWithReady",
+    "in": [
+      [
+        "fn",
+        [
+          "listen"
+        ]
+      ]
+    ],
+    "out": [
+      "ready()",
+      "caller"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            0,
+            "ready"
+          ]
+        ]
+      },
+      {
+        "wait": 0.4,
+        "emit": [
+          [
+            1,
+            "resume"
+          ]
+        ]
+      }
+    ],
+    "note": "The caller blocks until fn calls ready() or returns.",
+    "alt": "StartWithReady runs fn. fn calls ready() after listen, and only then the caller resumes."
+  },
+  "wait": {
+    "op": "Wait(fn)",
+    "in": [
+      [
+        "",
+        [
+          "user",
+          "orders"
+        ]
+      ]
+    ],
+    "out": [
+      "return",
+      "wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            0,
+            "wait"
+          ]
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            0,
+            "wait"
+          ]
+        ]
+      },
+      {
+        "wait": 0.8,
+        "emit": [
+          [
+            1,
+            "nil"
+          ],
+          [
+            1,
+            "nil"
+          ]
+        ]
+      }
+    ],
+    "note": "Wait returns a wait function at once. wait() blocks until fn ends.",
+    "alt": "Wait starts user and orders and returns a wait function for each at once. Later each wait() returns nil."
+  },
+  "do": {
+    "op": "Do(fn)",
+    "in": [
+      [
+        "calls",
+        [
+          "ok",
+          "err"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "error"
+    ],
+    "emit": [
+      "nil",
+      null
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          "nil"
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      }
+    ],
+    "note": "Do runs fn on the caller goroutine and returns the error.",
+    "alt": "Do runs ok and returns nil. Do runs err and returns err to the caller."
+  },
+  "group": {
+    "op": "Group",
+    "in": [
+      [
+        "Add",
+        [
+          "A",
+          "B",
+          "C"
+        ]
+      ]
+    ],
+    "out": [
+      "Wait()"
+    ],
+    "red": [
+      "Wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "errors.Join"
+        ]
+      }
+    ],
+    "note": "B fails. Wait blocks until A, B and C end, then joins all errors.",
+    "alt": "Group runs A, B and C at the same time. B fails. Wait returns errors.Join of all errors."
+  },
+  "group-limit": {
+    "op": "WithLimit(2)",
+    "in": [
+      [
+        "Add",
+        [
+          "f1",
+          "f2",
+          "f3",
+          "f4",
+          "f5"
+        ]
+      ]
+    ],
+    "out": [
+      "done"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1
+        ]
+      },
+      {
+        "wait": 0.6,
+        "take": [
+          2
+        ],
+        "emit": [
+          "f1"
+        ]
+      },
+      {
+        "take": [
+          3
+        ],
+        "emit": [
+          "f2"
+        ]
+      },
+      {
+        "take": [
+          4
+        ],
+        "emit": [
+          "f3"
+        ]
+      },
+      {
+        "wait": 0.4,
+        "emit": [
+          "f4",
+          "f5"
+        ]
+      }
+    ],
+    "note": "At most 2 functions run at the same time. Add blocks until a slot is free.",
+    "alt": "A group with WithLimit(2) runs f1 and f2. Each next function starts only when a running function ends."
+  },
+  "failfast": {
+    "op": "WithFailFast()",
+    "in": [
+      [
+        "Add",
+        [
+          "f1",
+          "f2",
+          "f3",
+          "f4"
+        ]
+      ]
+    ],
+    "out": [
+      "ok",
+      "error"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            0,
+            "nil"
+          ]
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "take": [
+          2,
+          3
+        ],
+        "emit": [
+          [
+            1,
+            "canceled"
+          ],
+          [
+            1,
+            "canceled"
+          ]
+        ]
+      }
+    ],
+    "note": "f2 fails and cancels the group context. f3 and f4 see ctx.Done().",
+    "alt": "In a fail-fast group, f1 returns nil, f2 returns err, and f3 and f4 get context.Canceled."
+  },
+  "all": {
+    "op": "All(WithLimit(2))",
+    "in": [
+      [
+        "urls",
+        [
+          "u1",
+          "u2",
+          "u3"
+        ]
+      ]
+    ],
+    "out": [
+      "return"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1
+        ]
+      },
+      {
+        "wait": 0.6,
+        "take": [
+          2
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "All calls fn for each item and returns one joined error.",
+    "alt": "All calls fn for u1, u2 and u3 with at most 2 at the same time, then returns nil."
+  },
+  "map": {
+    "op": "Map(fn)",
+    "in": [
+      [
+        "ids",
+        [
+          "1",
+          "2",
+          "3"
+        ]
+      ]
+    ],
+    "out": [
+      "results"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "user-1",
+          "user-2",
+          "user-3"
+        ]
+      }
+    ],
+    "note": "Results keep the input order.",
+    "alt": "Map turns ids 1, 2 and 3 into user-1, user-2 and user-3 in the same order."
+  },
+  "map-upper": {
+    "op": "Map(ToUpper)",
+    "in": [
+      [
+        "words",
+        [
+          "hello",
+          "world",
+          "gofuncy"
+        ]
+      ]
+    ],
+    "out": [
+      ""
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "HELLO",
+          "WORLD",
+          "GOFUNCY"
+        ]
+      }
+    ],
+    "note": "fn runs for all words at the same time. Results keep the input order.",
+    "alt": "Map with strings.ToUpper turns hello, world and gofuncy into HELLO, WORLD and GOFUNCY in the same order."
+  },
+  "fanout": {
+    "op": "WithLimit(3)",
+    "in": [
+      [
+        "ids",
+        [
+          "101",
+          "102",
+          "103",
+          "104"
+        ]
+      ]
+    ],
+    "out": [
+      "orders"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "wait": 0.6,
+        "take": [
+          3
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "o101",
+          "o102",
+          "o103",
+          "o104"
+        ]
+      }
+    ],
+    "note": "At most 3 fetches run at the same time. Results keep the input order.",
+    "alt": "Map with WithLimit(3) fetches orders 101 to 104 with at most 3 at the same time and returns them in input order."
+  },
+  "limiter": {
+    "op": "WithLimiter(2)",
+    "in": [
+      [
+        "site A",
+        [
+          "a1",
+          "a2"
+        ]
+      ],
+      [
+        "site B",
+        [
+          "b1",
+          "b2"
+        ]
+      ]
+    ],
+    "out": [
+      "done"
+    ],
+    "steps": [
+      {
+        "take": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ]
+        ]
+      },
+      {
+        "wait": 0.6,
+        "take": [
+          [
+            0,
+            1
+          ]
+        ],
+        "emit": [
+          "a1"
+        ]
+      },
+      {
+        "take": [
+          [
+            1,
+            1
+          ]
+        ],
+        "emit": [
+          "b1"
+        ]
+      },
+      {
+        "wait": 0.4,
+        "emit": [
+          "a2",
+          "b2"
+        ]
+      }
+    ],
+    "note": "One shared semaphore limits goroutines from all call sites.",
+    "alt": "Two call sites share one limiter of size 2. a1 and b1 run first. a2 and b2 start only when a slot is free."
+  },
+  "recover": {
+    "op": "withRecover",
+    "in": [
+      [
+        "fn",
+        [
+          "nil",
+          "panic"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "error"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          "nil"
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "PanicError"
+          ]
+        ]
+      }
+    ],
+    "note": "A panic becomes a *PanicError with the stack trace.",
+    "alt": "withRecover passes nil through and turns a panic into a PanicError."
+  },
+  "retry": {
+    "op": "WithRetry(3)",
+    "in": [
+      [
+        "attempts",
+        [
+          "err",
+          "err",
+          "ok"
+        ]
+      ]
+    ],
+    "out": [
+      "result",
+      "retried"
+    ],
+    "red": [
+      "retried"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "wait": 0.5,
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "wait": 0.9,
+        "take": [
+          2
+        ],
+        "emit": [
+          [
+            0,
+            "nil"
+          ]
+        ]
+      }
+    ],
+    "note": "Backoff waits about 100ms, then 200ms, with jitter.",
+    "alt": "WithRetry(3) retries after two failed attempts. The third attempt succeeds and the result is nil."
+  },
+  "breaker": {
+    "op": "CircuitBreaker",
+    "in": [
+      [
+        "calls",
+        [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      ]
+    ],
+    "out": [
+      "ok",
+      "error"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "err"
+          ]
+        ]
+      },
+      {
+        "take": [
+          2
+        ],
+        "emit": [
+          [
+            1,
+            "open"
+          ]
+        ]
+      },
+      {
+        "take": [
+          3
+        ],
+        "emit": [
+          [
+            1,
+            "open"
+          ]
+        ]
+      },
+      {
+        "wait": 1.0,
+        "take": [
+          4
+        ],
+        "emit": [
+          [
+            0,
+            "nil"
+          ]
+        ]
+      }
+    ],
+    "note": "Threshold 2. Calls 3 and 4 get ErrCircuitOpen. Call 5 runs after the cooldown.",
+    "alt": "A circuit breaker with threshold 2 lets 2 failed calls through, then rejects calls 3 and 4 with ErrCircuitOpen. After the cooldown, call 5 succeeds and closes the breaker."
+  },
+  "fallback": {
+    "op": "WithFallback(fn)",
+    "in": [
+      [
+        "",
+        [
+          "ok",
+          "err",
+          "panic"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "error"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          "nil"
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          "cache"
+        ]
+      },
+      {
+        "take": [
+          2
+        ],
+        "emit": [
+          [
+            1,
+            "PanicError"
+          ]
+        ]
+      }
+    ],
+    "note": "Fallback skips PanicError, Canceled and DeadlineExceeded.",
+    "alt": "WithFallback passes ok through, replaces err with the cache value, and passes a PanicError through."
+  },
+  "stall": {
+    "op": "WithStallThreshold(1s)",
+    "in": [
+      [
+        "",
+        [
+          "fast",
+          "slow"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "warn"
+    ],
+    "red": [
+      "warn"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          "nil"
+        ]
+      },
+      {
+        "take": [
+          1
+        ],
+        "emit": [
+          [
+            1,
+            "stall"
+          ]
+        ]
+      },
+      {
+        "wait": 0.8,
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "The detector logs a warning. It does not stop fn.",
+    "alt": "The stall detector lets fast end. For slow it logs a stall warning, and slow still ends later."
+  },
+  "chain": {
+    "ops": [
+      "timeout",
+      "retry",
+      "fallback"
+    ],
+    "in": [
+      [
+        "",
+        [
+          "ok",
+          "err",
+          "slow"
+        ]
+      ]
+    ],
+    "mid": [
+      1,
+      1
+    ],
+    "out": [
+      "",
+      "ctx"
+    ],
+    "red": [
+      "ctx"
+    ],
+    "paths": [
+      {
+        "from": [
+          0,
+          0
+        ],
+        "hops": [
+          [
+            0,
+            "ok"
+          ],
+          [
+            0,
+            "ok"
+          ],
+          [
+            0,
+            "ok"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          1
+        ],
+        "hops": [
+          [
+            0,
+            "err"
+          ],
+          [
+            0,
+            "err",
+            0.9
+          ],
+          [
+            0,
+            "cache"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          2
+        ],
+        "hops": [
+          [
+            0,
+            "late",
+            0.6
+          ],
+          [
+            0,
+            "late"
+          ],
+          [
+            1,
+            "late"
+          ]
+        ]
+      }
+    ],
+    "note": "late is DeadlineExceeded. Retry and fallback skip it.",
+    "alt": "The resilience chain: err fails again in retry and becomes cache in fallback. A slow call becomes DeadlineExceeded in timeout and passes retry and fallback unchanged."
+  },
+  "channel": {
+    "ops": [
+      "Send",
+      "Receive"
+    ],
+    "in": [
+      [
+        "producer",
+        [
+          "e0",
+          "e1",
+          "e2",
+          "e3"
+        ]
+      ]
+    ],
+    "mid": [
+      1
+    ],
+    "out": [
+      "consumer"
+    ],
+    "stagger": 0.6,
+    "paths": [
+      {
+        "from": [
+          0,
+          0
+        ],
+        "hops": [
+          [
+            0,
+            "e0"
+          ],
+          [
+            0,
+            "e0"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          1
+        ],
+        "hops": [
+          [
+            0,
+            "e1"
+          ],
+          [
+            0,
+            "e1"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          2
+        ],
+        "hops": [
+          [
+            0,
+            "e2"
+          ],
+          [
+            0,
+            "e2"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          3
+        ],
+        "hops": [
+          [
+            0,
+            "e3"
+          ],
+          [
+            0,
+            "e3"
+          ]
+        ]
+      }
+    ],
+    "note": "Send counts each value in gofuncy.messages.sent. The example uses event-0 to event-4.",
+    "alt": "A producer sends e0 to e3 into a channel. The consumer receives them in the same order."
+  },
+  "gofunc": {
+    "op": "go func()",
+    "in": [
+      [
+        "calls",
+        [
+          "ok",
+          "err",
+          "panic"
+        ]
+      ]
+    ],
+    "out": [
+      "",
+      "process"
+    ],
+    "red": [
+      "process"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ]
+      },
+      {
+        "take": [
+          1
+        ]
+      },
+      {
+        "take": [
+          2
+        ],
+        "emit": [
+          [
+            1,
+            "crash"
+          ]
+        ]
+      }
+    ],
+    "note": "The err is lost. The panic stops the whole process.",
+    "alt": "A bare go func() runs three calls. The ok call ends, the err call loses its error, and the panic call crashes the process."
+  },
+  "start": {
+    "op": "Start(fn)",
+    "in": [
+      [
+        "fn",
+        [
+          "serve"
+        ]
+      ]
+    ],
+    "out": [
+      "running",
+      "caller"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            0,
+            "serve"
+          ]
+        ]
+      },
+      {
+        "wait": 0.3,
+        "emit": [
+          [
+            1,
+            "resume"
+          ]
+        ]
+      }
+    ],
+    "note": "Start returns only when the goroutine runs.",
+    "alt": "Start begins serve in a goroutine. The caller resumes only after serve runs."
+  },
+  "startwithstop": {
+    "op": "StartWithStop",
+    "in": [
+      [
+        "incoming",
+        [
+          "m1",
+          "m2",
+          "quit",
+          "m4"
+        ]
+      ]
+    ],
+    "out": [
+      "return"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ]
+      },
+      {
+        "take": [
+          1
+        ]
+      },
+      {
+        "take": [
+          2
+        ],
+        "emit": [
+          "nil"
+        ],
+        "wait": 0.2
+      }
+    ],
+    "note": "fn calls stop() on quit. ctx ends and fn returns nil. m4 is not read.",
+    "alt": "StartWithStop reads m1 and m2. On quit, fn calls stop(), the context ends, fn returns nil and m4 stays unread."
+  },
+  "waitwithstop": {
+    "op": "WaitWithStop",
+    "in": [
+      [
+        "incoming",
+        [
+          "m1",
+          "done",
+          "m3"
+        ]
+      ]
+    ],
+    "out": [
+      "return",
+      "wait()"
+    ],
+    "steps": [
+      {
+        "emit": [
+          [
+            0,
+            "wait"
+          ]
+        ]
+      },
+      {
+        "take": [
+          0
+        ]
+      },
+      {
+        "take": [
+          1
+        ]
+      },
+      {
+        "wait": 0.3,
+        "emit": [
+          [
+            1,
+            "nil"
+          ]
+        ]
+      }
+    ],
+    "note": "fn calls stop() on done. wait() then returns nil. m3 is not read.",
+    "alt": "WaitWithStop returns a wait function at once. fn reads m1 and done, calls stop(), and wait() returns nil. m3 stays unread."
+  },
+  "waitwithready": {
+    "op": "WaitWithReady",
+    "in": [
+      [
+        "fn",
+        [
+          "init"
+        ]
+      ]
+    ],
+    "out": [
+      "ready()",
+      "return",
+      "wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          0
+        ],
+        "emit": [
+          [
+            0,
+            "ready"
+          ]
+        ]
+      },
+      {
+        "wait": 0.2,
+        "emit": [
+          [
+            1,
+            "wait"
+          ]
+        ]
+      },
+      {
+        "wait": 0.8,
+        "emit": [
+          [
+            2,
+            "nil"
+          ]
+        ]
+      }
+    ],
+    "note": "WaitWithReady returns after ready(). wait() blocks until fn ends.",
+    "alt": "WaitWithReady runs init. fn calls ready(), then the caller gets the wait function. Later wait() returns nil."
+  },
+  "errors": {
+    "op": "error flow",
+    "in": [
+      [
+        "Go",
+        [
+          "err"
+        ]
+      ],
+      [
+        "Group",
+        [
+          "e1",
+          "e2"
+        ]
+      ]
+    ],
+    "out": [
+      "ErrorHandler",
+      "Wait()"
+    ],
+    "red": [
+      "ErrorHandler",
+      "Wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          [
+            0,
+            0
+          ]
+        ],
+        "emit": [
+          [
+            0,
+            "err"
+          ]
+        ]
+      },
+      {
+        "take": [
+          [
+            1,
+            0
+          ],
+          [
+            1,
+            1
+          ]
+        ],
+        "emit": [
+          [
+            1,
+            "errors.Join"
+          ]
+        ]
+      }
+    ],
+    "note": "Go sends each error to the ErrorHandler. Group, All and Map join all errors.",
+    "alt": "An error from Go goes to the ErrorHandler. Two errors in a Group come out of Wait as one errors.Join error."
+  },
+  "context": {
+    "ops": [
+      "WithName(api)",
+      "WithName(db)"
+    ],
+    "in": [
+      [
+        "ctx",
+        [
+          "root"
+        ]
+      ]
+    ],
+    "mid": [
+      1
+    ],
+    "out": [
+      "ctx"
+    ],
+    "paths": [
+      {
+        "from": [
+          0,
+          0
+        ],
+        "hops": [
+          [
+            0,
+            "api"
+          ],
+          [
+            0,
+            "db<api"
+          ]
+        ]
+      }
+    ],
+    "note": "db<api means Name() is db and Parent() is api.",
+    "alt": "A context goes through a routine named api, then a routine named db. In db, Name() is db and Parent() is api."
+  },
+  "middleware": {
+    "ops": [
+      "retry",
+      "logging",
+      "metrics"
+    ],
+    "in": [
+      [
+        "",
+        [
+          "ok",
+          "err",
+          "panic"
+        ]
+      ]
+    ],
+    "mid": [
+      1,
+      1
+    ],
+    "out": [
+      "",
+      "error"
+    ],
+    "paths": [
+      {
+        "from": [
+          0,
+          0
+        ],
+        "hops": [
+          [
+            0,
+            "ok"
+          ],
+          [
+            0,
+            "ok"
+          ],
+          [
+            0,
+            "ok"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          1
+        ],
+        "hops": [
+          [
+            0,
+            "ok",
+            0.9
+          ],
+          [
+            0,
+            "ok"
+          ],
+          [
+            0,
+            "ok"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          2
+        ],
+        "hops": [
+          [
+            0,
+            "panic"
+          ],
+          [
+            0,
+            "panic"
+          ],
+          [
+            1,
+            "panic"
+          ]
+        ]
+      }
+    ],
+    "note": "User middleware sees the result after retry, and before metrics.",
+    "alt": "User middleware sits between the resilience layers and metrics. A retried err reaches logging as ok. A panic reaches logging as PanicError."
+  },
+  "map-timeout": {
+    "op": "WithTimeout(250ms)",
+    "in": [
+      [
+        "ids",
+        [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      ]
+    ],
+    "out": [
+      "results",
+      "error"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2
+        ]
+      },
+      {
+        "wait": 0.3,
+        "take": [
+          3
+        ],
+        "emit": [
+          "result-1"
+        ]
+      },
+      {
+        "take": [
+          4
+        ],
+        "emit": [
+          "result-2"
+        ]
+      },
+      {
+        "wait": 0.4,
+        "emit": [
+          [
+            1,
+            "late"
+          ],
+          [
+            1,
+            "late"
+          ],
+          [
+            1,
+            "late"
+          ]
+        ]
+      }
+    ],
+    "note": "Each call gets 250ms. Calls 3 to 5 end with DeadlineExceeded.",
+    "alt": "Map with WithTimeout(250ms) and WithLimit(3): ids 1 and 2 give result-1 and result-2. ids 3, 4 and 5 time out."
+  },
+  "shutdown": {
+    "op": "Group",
+    "in": [
+      [
+        "workers",
+        [
+          "w0",
+          "w1",
+          "w2"
+        ]
+      ],
+      [
+        "signal",
+        [
+          "SIGTERM"
+        ]
+      ]
+    ],
+    "out": [
+      "Wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          [
+            0,
+            0
+          ],
+          [
+            0,
+            1
+          ],
+          [
+            0,
+            2
+          ]
+        ]
+      },
+      {
+        "wait": 0.6,
+        "take": [
+          [
+            1,
+            0
+          ]
+        ],
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "SIGTERM cancels ctx. Each worker returns nil, then Wait returns.",
+    "alt": "A group runs workers w0, w1 and w2. SIGTERM cancels the context, all workers return nil and Wait returns nil."
+  },
+  "batch": {
+    "op": "WithLimit(2)",
+    "in": [
+      [
+        "items",
+        [
+          "0",
+          "1",
+          "2",
+          "3",
+          "4"
+        ]
+      ]
+    ],
+    "out": [
+      "return"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1
+        ]
+      },
+      {
+        "wait": 0.5,
+        "take": [
+          2
+        ]
+      },
+      {
+        "take": [
+          3
+        ]
+      },
+      {
+        "wait": 0.4,
+        "take": [
+          4
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "The example uses 100 items and WithLimit(10).",
+    "alt": "All processes items 0 to 4 with at most 2 at the same time and returns nil."
+  },
+  "aggregate": {
+    "op": "Group",
+    "in": [
+      [
+        "users",
+        [
+          "1500"
+        ]
+      ],
+      [
+        "orders",
+        [
+          "3200"
+        ]
+      ],
+      [
+        "billing",
+        [
+          "450000"
+        ]
+      ]
+    ],
+    "out": [
+      "Wait()"
+    ],
+    "steps": [
+      {
+        "take": [
+          [
+            0,
+            0
+          ],
+          [
+            1,
+            0
+          ],
+          [
+            2,
+            0
+          ]
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "Three sources run at the same time. Wait returns when all end.",
+    "alt": "A group fetches users, orders and billing at the same time. Wait returns nil when all three end."
+  },
+  "all-items": {
+    "op": "WithLimit(2)",
+    "in": [
+      [
+        "items",
+        [
+          "alpha",
+          "bravo",
+          "charlie",
+          "delta",
+          "echo"
+        ]
+      ]
+    ],
+    "out": [
+      "return"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1
+        ]
+      },
+      {
+        "wait": 0.5,
+        "take": [
+          2
+        ]
+      },
+      {
+        "take": [
+          3
+        ]
+      },
+      {
+        "wait": 0.4,
+        "take": [
+          4
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "nil"
+        ]
+      }
+    ],
+    "note": "All processes 2 items at the same time.",
+    "alt": "All processes alpha, bravo, charlie, delta and echo with at most 2 at the same time and returns nil."
+  },
+  "map-squares": {
+    "op": "Map(n * n)",
+    "in": [
+      [
+        "numbers",
+        [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      ]
+    ],
+    "out": [
+      "squares"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "wait": 0.6,
+        "emit": [
+          "1",
+          "4",
+          "9",
+          "16",
+          "25"
+        ]
+      }
+    ],
+    "note": "Results keep the input order.",
+    "alt": "Map turns 1, 2, 3, 4 and 5 into 1, 4, 9, 16 and 25 in the same order."
+  },
+  "channel-buffer": {
+    "op": "WithBuffer(5)",
+    "in": [
+      [
+        "Send",
+        [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      ]
+    ],
+    "out": [
+      "Receive"
+    ],
+    "steps": [
+      {
+        "take": [
+          0,
+          1,
+          2,
+          3,
+          4
+        ]
+      },
+      {
+        "wait": 0.8,
+        "emit": [
+          "1",
+          "2",
+          "3",
+          "4",
+          "5"
+        ]
+      }
+    ],
+    "note": "Send fills the buffer. After Close, range reads all 5 values.",
+    "alt": "Send puts 1 to 5 into a channel with buffer 5. After Close, range over Receive reads 1 to 5."
+  },
+  "pipeline": {
+    "ops": [
+      "trim",
+      "lower"
+    ],
+    "in": [
+      [
+        "",
+        [
+          "\u00b7hello",
+          "\u00b7WORLD",
+          "\u00b7GoFuncy"
+        ]
+      ]
+    ],
+    "mid": [
+      1
+    ],
+    "out": [
+      ""
+    ],
+    "stagger": 0.15,
+    "paths": [
+      {
+        "from": [
+          0,
+          0
+        ],
+        "hops": [
+          [
+            0,
+            "hello"
+          ],
+          [
+            0,
+            "hello"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          1
+        ],
+        "hops": [
+          [
+            0,
+            "WORLD"
+          ],
+          [
+            0,
+            "world"
+          ]
+        ]
+      },
+      {
+        "from": [
+          0,
+          2
+        ],
+        "hops": [
+          [
+            0,
+            "GoFuncy"
+          ],
+          [
+            0,
+            "gofuncy"
+          ]
+        ]
+      }
+    ],
+    "note": "\u00b7 marks the padding. Stage 2 starts after stage 1 ends.",
+    "alt": "Two Map stages: trim turns padded strings into hello, WORLD and GoFuncy. lower turns them into hello, world and gofuncy."
+  }
+}

@@ -65,6 +65,8 @@ Counters are cheap and enabled by default. Duration histogram and tracing are op
 4. `Receive` returns the raw underlying `<-chan T`. This is zero-allocation and works with `range`.
 5. `Close` is idempotent — safe to call multiple times. It broadcasts to all blocked senders, then closes the underlying channel.
 
+![Send puts 1 to 5 into a channel with buffer 5. After Close, range over Receive reads 1 to 5.](../guide/diagrams/channel-buffer.svg)
+
 ## Methods
 
 ### Send
@@ -103,7 +105,11 @@ Return the current number of buffered values, the buffer capacity, and the chann
 
 ## Example
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/channel.svg" alt="A producer sends e0 to e3 into a channel. The consumer receives them in the same order."></div>
+
+```go [Code]
 package main
 
 import (
@@ -142,6 +148,8 @@ func main() {
 	time.Sleep(100 * time.Millisecond)
 }
 ```
+
+:::
 
 ## Telemetry Metrics
 

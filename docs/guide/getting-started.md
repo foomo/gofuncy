@@ -23,7 +23,11 @@ go get github.com/foomo/gofuncy
 
 The simplest use case is spawning a goroutine that handles its own errors:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/go.svg" alt="Go runs three calls. The ok call ends without output. The err call and the panic call send err and PanicError to the ErrorHandler."></div>
+
+```go [Code]
 package main
 
 import (
@@ -48,6 +52,8 @@ func main() {
 }
 ```
 
+:::
+
 `Go` automatically:
 - Recovers panics (converts them to `*PanicError`)
 - Logs errors via `slog` (override with `WithErrorHandler`)
@@ -58,7 +64,11 @@ func main() {
 
 When you need to wait for multiple goroutines and collect their errors:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/group.svg" alt="Group runs A, B and C at the same time. B fails. Wait returns errors.Join of all errors."></div>
+
+```go [Code]
 package main
 
 import (
@@ -91,11 +101,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Transforming a Slice with Map
 
 Use `Map` to transform items concurrently while preserving input order:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/map-upper.svg" alt="Map with strings.ToUpper turns hello, world and gofuncy into HELLO, WORLD and GOFUNCY in the same order."></div>
+
+```go [Code]
 package main
 
 import (
@@ -122,6 +138,8 @@ func main() {
 	fmt.Println(upper) // [HELLO WORLD GOFUNCY]
 }
 ```
+
+:::
 
 ## Next Steps
 

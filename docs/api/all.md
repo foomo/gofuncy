@@ -93,7 +93,11 @@ If `items` is empty, returns `nil` immediately without creating a group.
 
 ## Example
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/all.svg" alt="All calls fn for u1, u2 and u3 with at most 2 at the same time, then returns nil."></div>
+
+```go [Code]
 package main
 
 import (
@@ -124,6 +128,8 @@ func main() {
 	}
 }
 ```
+
+:::
 
 ::: tip
 `All` is a convenience wrapper around `NewGroup` + `Add` + `Wait`. If you need per-item options or want to add functions dynamically, use `Group` directly.

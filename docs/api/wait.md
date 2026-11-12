@@ -11,6 +11,8 @@ next:
 
 Spawns a goroutine with the full middleware chain and returns a wait function for deferred result collection.
 
+![Wait starts user and orders and returns a wait function for each at once. Later each wait() returns nil.](../guide/diagrams/wait.svg)
+
 ## Signature
 
 ```go
@@ -90,6 +92,8 @@ func Wait(ctx context.Context, fn Func, opts ...GoOption) func() error
 
 Like `Wait`, but the goroutine receives a `StopFunc` it can call to cancel its own context. Returns a wait function for deferred result collection.
 
+![WaitWithStop returns a wait function at once. fn reads m1 and done, calls stop(), and wait() returns nil. m3 stays unread.](../guide/diagrams/waitwithstop.svg)
+
 ### Signature
 
 ```go
@@ -146,6 +150,8 @@ if err := wait(); err != nil {
 ## WaitWithReady
 
 Like `Wait`, but the goroutine receives a `ReadyFunc` it can call to signal readiness. The caller blocks until `ready()` is called or the function returns, then receives a wait function for deferred result collection.
+
+![WaitWithReady runs init. fn calls ready(), then the caller gets the wait function. Later wait() returns nil.](../guide/diagrams/waitwithready.svg)
 
 ### Signature
 

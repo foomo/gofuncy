@@ -41,7 +41,11 @@ func main() {
 
 Override the default slog handler to handle errors yourself.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/go.svg" alt="Go runs three calls. The ok call ends without output. The err call and the panic call send err and PanicError to the ErrorHandler."></div>
+
+```go [Code]
 package main
 
 import (
@@ -70,11 +74,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Async with Deferred Result
 
 Launch work now, collect the result when you need it. The wait function is safe to call from multiple goroutines.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/wait.svg" alt="Wait starts user and orders and returns a wait function for each at once. Later each wait() returns nil."></div>
+
+```go [Code]
 package main
 
 import (
@@ -116,11 +126,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Synchronous Execution with Do
 
 Run a function through the full middleware chain without spawning a goroutine. Useful for inline calls that need retry, timeout, or circuit breaker.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/do.svg" alt="Do runs ok and returns nil. Do runs err and returns err to the caller."></div>
+
+```go [Code]
 package main
 
 import (
@@ -147,11 +163,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Basic Group
 
 Run multiple functions concurrently and collect all errors.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/group.svg" alt="Group runs A, B and C at the same time. B fails. Wait returns errors.Join of all errors."></div>
+
+```go [Code]
 package main
 
 import (
@@ -193,11 +215,17 @@ func main() {
 }
 ```
 
+:::
+
 ## All Over a Slice
 
 Iterate over items concurrently with a concurrency limit.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/all-items.svg" alt="All processes alpha, bravo, charlie, delta and echo with at most 2 at the same time and returns nil."></div>
+
+```go [Code]
 package main
 
 import (
@@ -226,11 +254,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Channel
 
 Send and receive values through an observable channel with built-in metrics.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/channel-buffer.svg" alt="Send puts 1 to 5 into a channel with buffer 5. After Close, range over Receive reads 1 to 5."></div>
+
+```go [Code]
 package main
 
 import (
@@ -263,11 +297,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Map with Result Collection
 
 Transform items concurrently and collect results in order.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/map-squares.svg" alt="Map turns 1, 2, 3, 4 and 5 into 1, 4, 9, 16 and 25 in the same order."></div>
+
+```go [Code]
 package main
 
 import (
@@ -294,11 +334,17 @@ func main() {
 }
 ```
 
+:::
+
 ## Stoppable Goroutine with GoWithCancel
 
 Spawn a goroutine and stop it later.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/gowithcancel.svg" alt="GoWithCancel processes ticks t1 and t2. Then stop() cancels the context, fn returns nil, and t3 and t4 stay unprocessed."></div>
+
+```go [Code]
 package main
 
 import (
@@ -332,3 +378,5 @@ func main() {
 	// stopped
 }
 ```
+
+:::

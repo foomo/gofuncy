@@ -11,6 +11,8 @@ next:
 
 Manages a set of concurrently executing functions with shared lifecycle control, error collection, and optional fail-fast cancellation.
 
+![Group runs A, B and C at the same time. B fails. Wait returns errors.Join of all errors.](../guide/diagrams/group.svg)
+
 ## NewGroup
 
 Creates a new `Group`.
@@ -164,9 +166,15 @@ If `WithFailFast` was set, the group's context is cancelled after `Wait` returns
 4. Errors are stored by index. If `WithFailFast` is set, the first error cancels the group context.
 5. `Wait` blocks until all goroutines complete, finalizes the span, records the duration histogram, and returns joined errors.
 
+![In a fail-fast group, f1 returns nil, f2 returns err, and f3 and f4 get context.Canceled.](../guide/diagrams/failfast.svg)
+
 ## Example
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="../guide/diagrams/group-limit.svg" alt="A group with WithLimit(2) runs f1 and f2. Each next function starts only when a running function ends."></div>
+
+```go [Code]
 package main
 
 import (
@@ -180,11 +188,10 @@ func main() {
 	ctx := context.Background()
 
 	g := gofuncy.NewGroup(ctx,
-		gofuncy.WithLimit(3),       // at most 3 concurrent
-		gofuncy.WithFailFast(),     // cancel on first error
+		gofuncy.WithLimit(2), // at most 2 concurrent
 	)
 
-	for i := range 10 {
+	for i := range 5 {
 		g.Add(func(ctx context.Context) error {
 			fmt.Printf("processing item %d\n", i)
 			return nil
@@ -196,6 +203,8 @@ func main() {
 	}
 }
 ```
+
+:::
 
 ::: tip
 Options passed to `Add` are merged on top of group options. This lets you set shared defaults on the group and override per function -- for example, giving each function a unique name while sharing the same timeout.

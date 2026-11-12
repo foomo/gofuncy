@@ -11,6 +11,8 @@ next:
 
 Executes a function synchronously with the full middleware chain (resilience, telemetry, tracing) and returns the error directly.
 
+![Do runs ok and returns nil. Do runs err and returns err to the caller.](../guide/diagrams/do.svg)
+
 ## Signature
 
 ```go

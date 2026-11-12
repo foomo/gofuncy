@@ -44,6 +44,8 @@ See the full [Options reference](/api/options) for every available option.
 
 Every goroutine spawned by gofuncy automatically recovers from panics. A recovered panic is wrapped in a `*PanicError` that preserves the original value and the full stack trace:
 
+![withRecover passes nil through and turns a panic into a PanicError.](./diagrams/recover.svg)
+
 ```go
 type PanicError struct {
     Value any    // the recovered panic value
@@ -66,21 +68,31 @@ if errors.As(err, &panicErr) {
 - `Group.Wait` -- returns all errors from added functions via `errors.Join`.
 - `All` and `Map` -- return all errors via `errors.Join`.
 
+![An error from Go goes to the ErrorHandler. Two errors in a Group come out of Wait as one errors.Join error.](./diagrams/errors.svg)
+
 ### Fail-Fast
 
 Pass `WithFailFast()` to `NewGroup` to cancel all remaining functions when the first error occurs. The group's context is cancelled, so functions that check `ctx.Err()` will exit early.
+
+![In a fail-fast group, f1 returns nil, f2 returns err, and f3 and f4 get context.Canceled.](./diagrams/failfast.svg)
 
 ## Context and Naming
 
 gofuncy injects routine metadata into the context automatically:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/context.svg" alt="A context goes through a routine named api, then a routine named db. In db, Name() is db and Parent() is api."></div>
+
+```go [Code]
 // Extract the routine name (defaults to "noname")
 name := gofuncy.NameFromContext(ctx)
 
 // Extract the parent routine name (empty if none)
 parent := gofuncy.ParentFromContext(ctx)
 ```
+
+:::
 
 You can also use the `Context` helper:
 
@@ -101,16 +113,26 @@ gofuncy offers two levels of concurrency limiting:
 
 Limits the number of concurrently executing functions within a single group. Uses an internal buffered channel as a semaphore.
 
-```go
-// At most 5 functions run at the same time
-g := gofuncy.NewGroup(ctx, gofuncy.WithLimit(5))
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/group-limit.svg" alt="A group with WithLimit(2) runs f1 and f2. Each next function starts only when a running function ends."></div>
+
+```go [Code]
+// At most 2 functions run at the same time
+g := gofuncy.NewGroup(ctx, gofuncy.WithLimit(2))
 ```
+
+:::
 
 ### Cross-Callsite: WithLimiter
 
 Shares a `*semaphore.Weighted` across multiple `Go` or `Group.Add` calls, even across different groups. The semaphore is acquired before the goroutine starts and released when it completes.
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/limiter.svg" alt="Two call sites share one limiter of size 2. a1 and b1 run first. a2 and b2 start only when a slot is free."></div>
+
+```go [Code]
 import "golang.org/x/sync/semaphore"
 
 // Global limiter: at most 20 concurrent goroutines across all call sites
@@ -119,6 +141,8 @@ limiter := semaphore.NewWeighted(20)
 gofuncy.Go(ctx, fn1, gofuncy.WithLimiter(limiter))
 gofuncy.Go(ctx, fn2, gofuncy.WithLimiter(limiter))
 ```
+
+:::
 
 ::: warning
 `WithLimiter` acquires the semaphore **before** spawning the goroutine. If the context is cancelled while waiting, the error is handled immediately and the goroutine is not started.
@@ -136,12 +160,18 @@ fn → timeout → retry → circuitBreaker → fallback
 
 Retries transient errors with configurable backoff:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/retry.svg" alt="WithRetry(3) retries after two failed attempts. The third attempt succeeds and the result is nil."></div>
+
+```go [Code]
 gofuncy.Go(ctx, fetchData,
     gofuncy.WithRetry(3),
     gofuncy.WithTimeout(5*time.Second), // per-attempt timeout
 )
 ```
+
+:::
 
 By default, retry uses exponential backoff with jitter (100ms base, 2x multiplier, 30s cap) and skips non-retryable errors (`context.Canceled`, `context.DeadlineExceeded`, `*PanicError`).
 
@@ -151,7 +181,11 @@ See the [Options reference](/api/options) for all retry options and backoff stra
 
 Stops calling a broken dependency after repeated failures:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/breaker.svg" alt="A circuit breaker with threshold 2 lets 2 failed calls through, then rejects calls 3 and 4 with ErrCircuitOpen. After the cooldown, call 5 succeeds and closes the breaker."></div>
+
+```go [Code]
 var apiBreaker = gofuncy.NewCircuitBreaker(
     gofuncy.CircuitBreakerThreshold(5),
     gofuncy.CircuitBreakerCooldown(30*time.Second),
@@ -162,13 +196,19 @@ gofuncy.Go(ctx, callAPI,
 )
 ```
 
+:::
+
 The circuit breaker is stateful — share a single instance across all calls to the same dependency.
 
 ### Fallback
 
 Graceful degradation when a function fails:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/fallback.svg" alt="WithFallback passes ok through, replaces err with the cache value, and passes a PanicError through."></div>
+
+```go [Code]
 g.Add(fetchFromAPI,
     gofuncy.WithRetry(3),
     gofuncy.WithFallback(func(ctx context.Context, err error) error {
@@ -177,13 +217,19 @@ g.Add(fetchFromAPI,
 )
 ```
 
+:::
+
 See the [Options reference](/api/options) for fallback options.
 
 ### Combining Resilience Options
 
 All resilience options compose naturally. The framework guarantees the correct ordering:
 
-```go
+::: code-group
+
+<div class="vp-block active" data-title="Diagram"><img src="./diagrams/chain.svg" alt="The resilience chain: err fails again in retry and becomes cache in fallback. A slow call becomes DeadlineExceeded in timeout and passes retry and fallback unchanged."></div>
+
+```go [Code]
 g.Add(callAPI,
     gofuncy.WithTimeout(2*time.Second),          // each attempt: 2s
     gofuncy.WithRetry(3),                         // up to 3 attempts
@@ -194,9 +240,13 @@ g.Add(callAPI,
 )
 ```
 
+:::
+
 ## Custom Middleware
 
 For custom cross-cutting behavior, use the `Middleware` type with `WithMiddleware`:
+
+![User middleware sits between the resilience layers and metrics. A retried err reaches logging as ok. A panic reaches logging as PanicError.](./diagrams/middleware.svg)
 
 ```go
 type Middleware func(Func) Func

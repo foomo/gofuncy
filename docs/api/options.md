@@ -44,6 +44,8 @@ When no options are passed, the following defaults apply:
 
 The framework applies resilience options in a fixed order, regardless of the order they appear in your code:
 
+![The resilience chain: err fails again in retry and becomes cache in fallback. A slow call becomes DeadlineExceeded in timeout and passes retry and fallback unchanged.](../guide/diagrams/chain.svg)
+
 | Position | Middleware | Behavior |
 |----------|-----------|----------|
 | Innermost | **Timeout** | Each invocation gets a fresh deadline |
